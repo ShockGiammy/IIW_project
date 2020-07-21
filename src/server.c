@@ -23,7 +23,6 @@
 #include <errno.h>
 
 #define MAX_LINE	1000
-#define MAX_CHAT	(10000);
 
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
@@ -34,6 +33,7 @@ int ParseCmdLine(int argc, char *argv[], char **szPort);
 
 void *evadi_richiesta(void *arg) {
     printf("ciao");
+	fflush(stdout);
 }
 
 int main(int argc, char *argv[]) {
@@ -43,7 +43,6 @@ int main(int argc, char *argv[]) {
     int 	  sin_size;   
     short int port;                  /*  port number               */
 	int       list_s;                /*  listening socket          */
-	char buffer[MAX_LINE];
 	/*  Get command line arguments  */
 	int conn_s;
 	
