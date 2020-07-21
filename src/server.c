@@ -35,7 +35,7 @@ struct	  sockaddr_in their_addr;
 int gen_id;
 
 int ParseCmdLine(int argc, char *argv[], char **szPort);
-int SendFile(int socket_desc, char* file_name);
+int SendFile(int socket_desc, char* file_name, char *server_response);
 
 void *evadi_richiesta(void *socket_desc) {
 
@@ -58,13 +58,11 @@ void *evadi_richiesta(void *socket_desc) {
 while(1) {
 	Readline(socket, client_request, MAX_LINE-1);
 	if (strcmp(client_request, "list\n") == 0){
-		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 
 		struct dirent *de;
 
 		DIR *dr = opendir("DirectoryFiles");
-	    if (dr == NULL)
-	    {
+	    if (dr == NULL) {
 	    	char result[50] = "Could not open current directory\n";
 		    printf("%s\n", result);
 	        send(socket, result, sizeof(result), 0);
@@ -84,43 +82,39 @@ while(1) {
 	}
 
 	else if (strcmp(client_request, "get\n") == 0){
-		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 
 		recv(socket, filesName, 50,0);
 		printf("File name is %s \n  ", filesName);
 
-		SendFile(socket, filesName);
+		SendFile(socket, filesName, server_response);
 		printf("file transfer completed \n");
 	}
 
 	else if (strcmp(client_request, "put\n") == 0){
-		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 
 		printf("TODO");
 	}
-	else {
-		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
-
-		char result[50] = "command not valid\n";
-		printf("%s\n", result);
-	    send(socket, result, sizeof(result), 0);
-	}
 }
 }
 
-int SendFile(int socket_desc, char* file_name){
+int SendFile(int socket_desc, char* file_name, char *server_response){
 
 	struct stat	obj;
-	int		file_desc,
-			file_size;
 
-	stat(file_name, &obj);
-	file_desc = open(file_name, O_RDONLY);
-	file_size = obj.st_size;
-	send(socket_desc, &file_size, sizeof(int), 0);
-	sendfile(socket_desc, file_desc, NULL, file_size);
+	int file_desc = open(file_name, O_RDONLY);
+	fstat(file_desc, &obj);
+	int file_size = obj.st_size;
 
-	close(socket_desc);
+	printf("\nopened file\n");
+
+	int n;
+	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
+		server_response[n] = '\0';
+		write(socket_desc, server_response, n);
+	}
+
+	close(file_desc);
+	//close(socket_desc);
 	return 0;
 }
 

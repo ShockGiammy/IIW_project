@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
 	struct	  hostent *he;
 	char command[BUFSIZ];
 	char fname[BUFSIZ];
-	char bufferFile[BUFSIZ];
 	char username[40];
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -103,11 +102,11 @@ int main(int argc, char *argv[]) {
     }
 
 	/* connessione */
-	pthread_t tid;
+	/*pthread_t tid;
 	if(pthread_create(&tid,NULL,(void*)ricevi_msg,NULL) != 0) {  
 		printf("Errore nella crezione del thread \n");
 		exit(-1);
-	}
+	}*/
 	printf("Inserire nome utente :");
 	if(fgets(username,39,stdin) == NULL) {
 		printf("Errore fgets\n");
@@ -144,16 +143,17 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		if(strcmp(command,"get\n") == 0) {
+		else if(strcmp(command,"get\n") == 0) {
 			Writeline(conn_s, command, strlen(command));
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
-			printf("Enter the name of the file u want to receive : ");
+			printf("Enter the name of the file you want to receive: ");
 			scanf("%s",fname);
 			send(conn_s, fname, sizeof(fname), 0);
 
-			int fd=open(fname,O_WRONLY|O_CREAT,S_IRWXU);
+			int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
+			char bufferFile[BUFSIZ];
+
 			int n;
-			while ((n = read(conn_s, bufferFile, BUFSIZ-1)) > 0) {
+			while ((n = recv(conn_s, bufferFile, BUFSIZ-1, 0)) > 0) {
 				bufferFile[n] = '\0';
 				write(fd, bufferFile, n);
 				if( n < BUFSIZ-2) {
@@ -162,15 +162,22 @@ int main(int argc, char *argv[]) {
 			}
 
 			printf("file receiving completed \n");
-			close(conn_s);
+			fflush(stdout);
+			//close(conn_s);
 			close(fd);
 			
 		}
-		if(strcmp(command,"put\n") == 0){
+
+		else if(strcmp(command,"put\n") == 0){
 			printf("todo\n");
 		}
-		if(strcmp(command,"help\n") == 0){
+		
+		else if(strcmp(command,"help\n") == 0){
 			show_menu();
+		}
+
+		else {
+			printf("Command not valid\n");
 		}
 	}while(1);
 }
