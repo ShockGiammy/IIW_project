@@ -9,6 +9,7 @@
 
 #include <sys/socket.h>       /*  socket definitions        */
 #include <sys/types.h>        /*  socket types              */
+#include <sys/stat.h>   	  /*  stat for files transfer   */
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
 
@@ -21,6 +22,10 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <errno.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
+#include "manage_client.h"
+#include <dirent.h>
 
 #define MAX_LINE	1000
 
@@ -30,10 +35,93 @@ struct	  sockaddr_in their_addr;
 int gen_id;
 
 int ParseCmdLine(int argc, char *argv[], char **szPort);
+int SendFile(int socket_desc, char* file_name);
 
-void *evadi_richiesta(void *arg) {
-    printf("ciao");
-	fflush(stdout);
+void *evadi_richiesta(void *socket_desc) {
+
+	char filesName[BUFSIZ];
+	char client_request[BUFSIZ];
+	char server_response[BUFSIZ];
+
+	char client[MAX_LINE];
+
+	struct stat stat_buf;
+
+	int socket = *(int*)socket_desc;
+	free((int*)socket_desc);
+
+	Readline(socket, client_request, MAX_LINE-1);
+	strcpy(client, client_request);
+	memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+	printf("Connection estabilished with %s", client);
+
+while(1) {
+	Readline(socket, client_request, MAX_LINE-1);
+	if (strcmp(client_request, "list\n") == 0){
+		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+
+		struct dirent *de;
+
+		DIR *dr = opendir("DirectoryFiles");
+	    if (dr == NULL)
+	    {
+	    	char result[50] = "Could not open current directory\n";
+		    printf("%s\n", result);
+	        send(socket, result, sizeof(result), 0);
+	    }
+
+		while ((de = readdir(dr)) != NULL){
+            char string[50];
+            strcpy(string, de->d_name);
+	        printf("%s\n", string);
+		    send(socket, string, sizeof(string), 0);
+       }
+
+		char stop[] = "STOP";
+		send(socket, stop, sizeof(stop), 0);
+	    closedir(dr);
+	    printf("file listing completed \n");
+	}
+
+	else if (strcmp(client_request, "get\n") == 0){
+		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+
+		recv(socket, filesName, 50,0);
+		printf("File name is %s \n  ", filesName);
+
+		SendFile(socket, filesName);
+		printf("file transfer completed \n");
+	}
+
+	else if (strcmp(client_request, "put\n") == 0){
+		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+
+		printf("TODO");
+	}
+	else {
+		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+
+		char result[50] = "command not valid\n";
+		printf("%s\n", result);
+	    send(socket, result, sizeof(result), 0);
+	}
+}
+}
+
+int SendFile(int socket_desc, char* file_name){
+
+	struct stat	obj;
+	int		file_desc,
+			file_size;
+
+	stat(file_name, &obj);
+	file_desc = open(file_name, O_RDONLY);
+	file_size = obj.st_size;
+	send(socket_desc, &file_size, sizeof(int), 0);
+	sendfile(socket_desc, file_desc, NULL, file_size);
+
+	close(socket_desc);
+	return 0;
 }
 
 int main(int argc, char *argv[]) {

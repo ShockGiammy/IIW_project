@@ -27,22 +27,13 @@ void ricevi_msg() {
 	char msg[MAX_LINE-1];
 	while(1){
 		if(recv(conn_s,msg,MAX_LINE-1,0) <= 0) {
-			printf("disconnecting \n");
+			printf("Disconnecting... \n");
 			if(close(conn_s) == -1) {
 				printf("Errore close ! \n");
 				exit(-1);
 			}
 			exit(0);
 		}
-		/*else if(strcmp(msg,"end_chat") == 0) {
-			printf("La chat è stata chiusa \n");
-			Writeline(conn_s, "end_chat", 9);
-			if(close(conn_s) == -1) {
-				printf("Errore close : %d\n",errno);
-				exit(-1);
-			}
-			exit(0);
-		}*/
 		printf("%s \n",msg);
 		memset(msg,0,sizeof(char)*(strlen(msg)+1));
 	}
@@ -66,7 +57,9 @@ int main(int argc, char *argv[]) {
     char     *szPort;                /*  Holds remote port         */
     char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
-	char buffer[MAX_LINE];
+	char command[BUFSIZ];
+	char fname[BUFSIZ];
+	char bufferFile[BUFSIZ];
 	char username[40];
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -76,15 +69,6 @@ int main(int argc, char *argv[]) {
 		printf("client: porta non riconosciuta.\n");
 		exit(EXIT_FAILURE);
     }
-
-	printf("Inserire nome utente :");
-	if(fgets(username,39,stdin) == NULL) {
-		printf("Errore fgets\n");
-		if(close(conn_s) == -1) {
-		printf("Errore close \n");
-		exit(-1);
-		}
-	}
 
     /*  Create the listening socket  */
 
@@ -124,34 +108,69 @@ int main(int argc, char *argv[]) {
 		printf("Errore nella crezione del thread \n");
 		exit(-1);
 	}
-	printf("Benvenuto nel server\n");
+	printf("Inserire nome utente :");
+	if(fgets(username,39,stdin) == NULL) {
+		printf("Errore fgets\n");
+		if(close(conn_s) == -1) {
+			printf("Errore close \n");
+			exit(-1);
+		}
+	}
+	Writeline(conn_s, username, strlen(username));
+
+	printf("Benvenuto nel server %s\n", username);
 	show_menu();
-	
+
 	do{
-		if(fgets(buffer,MAX_LINE-1,stdin) == NULL) {
+		if(fgets(command,MAX_LINE-1,stdin) == NULL) {
 			printf("Errore fgets\n");
 			if(close(conn_s) == -1) {
 				printf("Errore close \n");
 				exit(-1);
 			}
 		}
-		if(strcmp(buffer, "list\n") == 0) {
-			printf("Ecco la lista\n");
+		if(strcmp(command, "list\n") == 0) {
+			Writeline(conn_s, command, strlen(command));
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			printf("Files in the current directory : \n");
+			for(;;){
+				memset(&fname, '\0', 50);
+				int temp = recv(conn_s, fname, 50, 0);
+				if(strcmp(fname, "STOP") == 0){
+					printf("No more files in the directory.\n");
+					break;
+				}
+				printf("%s\n", fname);	
+			}
+		}
+
+		if(strcmp(command,"get\n") == 0) {
+			Writeline(conn_s, command, strlen(command));
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			printf("Enter the name of the file u want to receive : ");
+			scanf("%s",fname);
+			send(conn_s, fname, sizeof(fname), 0);
+
+			int fd=open(fname,O_WRONLY|O_CREAT,S_IRWXU);
+			int n;
+			while ((n = read(conn_s, bufferFile, BUFSIZ-1)) > 0) {
+				bufferFile[n] = '\0';
+				write(fd, bufferFile, n);
+				if( n < BUFSIZ-2) {
+					break;
+				}
+			}
+
+			printf("file receiving completed \n");
+			close(conn_s);
+			close(fd);
 			
 		}
-		if(strcmp(buffer,"get\n") == 0) {
-			printf("todo\n");
-			
-		}
-		if(strcmp(buffer,"put\n") == 0){
+		if(strcmp(command,"put\n") == 0){
 			printf("todo\n");
 		}
-		if(strcmp(buffer,"help\n") == 0){
+		if(strcmp(command,"help\n") == 0){
 			show_menu();
-		}
-		else {
-			Writeline(conn_s, buffer, strlen(buffer));
-			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1));
 		}
 	}while(1);
 }
@@ -159,7 +178,7 @@ int main(int argc, char *argv[]) {
 void show_menu() {
 	printf("\nMenù: \n");
 	printf("list: per visualizzare i file disponibili al download\n");
-	printf("get _nomeFile_: per richiedere un determinato file\n");
+	printf("get: per richiedere un determinato file\n");
 	printf("put: per caricare sul server un certo file\n");
 	printf("help: per visualizzare il menù\n\n");
 }
