@@ -55,57 +55,71 @@ void *evadi_richiesta(void *socket_desc) {
 	memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 	printf("Connection estabilished with %s", client);
 
-while(1) {
-	Readline(socket, client_request, MAX_LINE-1);
-	if (strcmp(client_request, "list\n") == 0){
+	while(1) {
+		Readline(socket, client_request, MAX_LINE-1);
+		if (strcmp(client_request, "list\n") == 0){
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+			
+			struct dirent *de;
 
-		struct dirent *de;
+			DIR *dr = opendir("DirectoryFiles");
+		    if (dr == NULL) {
+	    		char result[50] = "Could not open current directory\n";
+		    	printf("%s\n", result);
+	        	send(socket, result, sizeof(result), 0);
+	    	}
 
-		DIR *dr = opendir("DirectoryFiles");
-	    if (dr == NULL) {
-	    	char result[50] = "Could not open current directory\n";
-		    printf("%s\n", result);
-	        send(socket, result, sizeof(result), 0);
-	    }
+			while ((de = readdir(dr)) != NULL){
+    	        char string[50];
+        	    strcpy(string, de->d_name);
+	        	printf("%s\n", string);
+			    send(socket, string, sizeof(string), 0);
+    		}
+			char stop[] = "STOP";
+			send(socket, stop, sizeof(stop), 0);
+	    	closedir(dr);
+	    	printf("file listing completed \n");
+		}
 
-		while ((de = readdir(dr)) != NULL){
-            char string[50];
-            strcpy(string, de->d_name);
-	        printf("%s\n", string);
-		    send(socket, string, sizeof(string), 0);
-       }
+		else if (strcmp(client_request, "get\n") == 0){
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 
-		char stop[] = "STOP";
-		send(socket, stop, sizeof(stop), 0);
-	    closedir(dr);
-	    printf("file listing completed \n");
+			recv(socket, filesName, 50,0);
+			printf("file name is %s \n", filesName);
+
+			if (SendFile(socket, filesName, server_response) == 0) {
+				printf("file transfer completed \n");
+			}
+			else {
+				printf("file transfer error \n");
+				char error[] = "ERROR";
+				send(socket, error, sizeof(error), 0);
+			}
+		}
+
+		else if (strcmp(client_request, "put\n") == 0){
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+
+			printf("TODO");
+		}
 	}
-
-	else if (strcmp(client_request, "get\n") == 0){
-
-		recv(socket, filesName, 50,0);
-		printf("File name is %s \n  ", filesName);
-
-		SendFile(socket, filesName, server_response);
-		printf("file transfer completed \n");
-	}
-
-	else if (strcmp(client_request, "put\n") == 0){
-
-		printf("TODO");
-	}
-}
 }
 
 int SendFile(int socket_desc, char* file_name, char *server_response){
 
 	struct stat	obj;
 
-	int file_desc = open(file_name, O_RDONLY);
-	fstat(file_desc, &obj);
+	char path[BUFSIZ] = "DirectoryFiles/";
+	strcat(path, file_name);
+	int file_desc = open(path, O_RDONLY);
+	if (fstat(file_desc, &obj) == -1) {
+		printf("Error: file not found\n");
+		fflush(stdout);
+		return 1;
+	}
 	int file_size = obj.st_size;
 
-	printf("\nopened file\n");
+	printf("opening file\n");
 
 	int n;
 	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
