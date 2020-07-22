@@ -16,13 +16,13 @@
 
 #define MAX_LINE  4096
 #define STDIN 0
+#define COMMAND_SIZE 10
 
 char cmd[10];
 long conn_s;                /*  connection socket         */
 
 int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
-int retrieveFile(char* fname);
 
 /*void ricevi_msg() {
 	char msg[MAX_LINE-1];
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     char     *szPort;                /*  Holds remote port         */
     char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
-	char command[BUFSIZ];
+	char command[COMMAND_SIZE];
 	char fname[BUFSIZ];
 	char exitBuffer[10];
 	char username[40];
@@ -161,11 +161,28 @@ int main(int argc, char *argv[]) {
 			getchar();	// remove newline
 			send(conn_s, fname, sizeof(fname), 0);
 
-			retrieveFile(fname);
+			RetrieveFile(conn_s, fname);
 		}
 
 		else if(strcmp(command,"put\n") == 0){
-			printf("todo\n");
+			Writeline(conn_s, command, strlen(command));
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			
+			printf("Enter the name of the file you want to update: ");
+			scanf("%s",fname);
+			getchar();	// remove newline
+			send(conn_s, fname, sizeof(fname), 0);
+
+			char bufferFile[BUFSIZ];
+
+			if (SendFile(conn_s, fname, bufferFile) == 0) {
+				printf("file transfer completed \n");
+			}
+			else {
+				printf("file transfer error \n");
+				char error[] = "ERROR";
+				send(conn_s, error, sizeof(error), 0);
+			}
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
@@ -180,40 +197,6 @@ int main(int argc, char *argv[]) {
 	}while(1);
 }
 
-int retrieveFile(char* fname) {
-	char bufferFile[BUFSIZ];
-
-	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
-	if (fd == -1) {
-		printf("error to create file");
-		//recv(conn_s, bufferFile, BUFSIZ-1, 0);   //only to consume the socket buffer;
-		return -1;
-	}
-
-	int n;
-	while ((n = recv(conn_s, bufferFile, BUFSIZ-1, 0)) > 0) {
-		if (strcmp(bufferFile, "ERROR") == 0) {
-			printf("file transfer error \n");
-			if (remove(fname) != 0) {
-      			printf("Unable to delete the file \n");
-				fflush(stdout);
-				return -1;
-			}
-		}
-		else {
-			bufferFile[n] = '\0';
-			write(fd, bufferFile, n);
-			if( n < BUFSIZ-2) {
-				printf("file receiving completed \n");
-				fflush(stdout);
-				break;
-			}
-		}
-	}
-	//close(conn_s);
-	close(fd);
-	return 0;		
-}
 void show_menu() {
 	printf("\nMenù: \n");
 	printf("list: per visualizzare i file disponibili al download\n");

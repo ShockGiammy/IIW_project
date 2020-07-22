@@ -35,7 +35,6 @@ struct	  sockaddr_in their_addr;
 int gen_id;
 
 int ParseCmdLine(int argc, char *argv[], char **szPort);
-int SendFile(int socket_desc, char* file_name, char *server_response);
 
 void *evadi_richiesta(void *socket_desc) {
 
@@ -100,36 +99,12 @@ void *evadi_richiesta(void *socket_desc) {
 		else if (strcmp(client_request, "put\n") == 0){
 			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 
-			printf("TODO");
+			recv(socket, filesName, 50,0);
+			printf("file name is %s \n", filesName);
+
+			RetrieveFile(socket, filesName);
 		}
 	}
-}
-
-int SendFile(int socket_desc, char* file_name, char *server_response){
-
-	struct stat	obj;
-
-	char path[BUFSIZ] = "DirectoryFiles/";
-	strcat(path, file_name);
-	int file_desc = open(path, O_RDONLY);
-	if (fstat(file_desc, &obj) == -1) {
-		printf("Error: file not found\n");
-		fflush(stdout);
-		return 1;
-	}
-	int file_size = obj.st_size;
-
-	printf("opening file\n");
-
-	int n;
-	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
-		server_response[n] = '\0';
-		write(socket_desc, server_response, n);
-	}
-
-	close(file_desc);
-	//close(socket_desc);
-	return 0;
 }
 
 int main(int argc, char *argv[]) {
