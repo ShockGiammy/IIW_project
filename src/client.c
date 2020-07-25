@@ -57,10 +57,12 @@ int main(int argc, char *argv[]) {
     char     *szPort;                /*  Holds remote port         */
     char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
+
 	char command[COMMAND_SIZE];
 	char fname[BUFSIZ];
 	char exitBuffer[10];
 	char username[40];
+
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
     /*  Set the remote port  */
@@ -156,24 +158,27 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command,"get\n") == 0) {
 			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
+
 			printf("Enter the name of the file you want to receive: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			send(conn_s, fname, sizeof(fname), 0);
+			send(conn_s, fname, strlen(fname), 0);
 
 			RetrieveFile(conn_s, fname);
+			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 		}
 
 		else if(strcmp(command,"put\n") == 0){
+			char bufferFile[BUFSIZ];
+
 			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 			
 			printf("Enter the name of the file you want to update: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			send(conn_s, fname, sizeof(fname), 0);
+			send(conn_s, fname, strlen(fname), 0);
 
-			char bufferFile[BUFSIZ];
 
 			if (SendFile(conn_s, fname, bufferFile) == 0) {
 				printf("file transfer completed \n");
@@ -183,6 +188,7 @@ int main(int argc, char *argv[]) {
 				char error[] = "ERROR";
 				send(conn_s, error, sizeof(error), 0);
 			}
+			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
