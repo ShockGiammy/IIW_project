@@ -77,6 +77,7 @@ ssize_t Writeline(int sockd, const void *vptr, size_t n)
 
 int SendFile(int socket_desc, char* file_name, char *server_response) {
 
+	int first_byte = 0;
 	struct stat	obj;
 
 	char path[BUFSIZ] = "DirectoryFiles/";
@@ -93,8 +94,26 @@ int SendFile(int socket_desc, char* file_name, char *server_response) {
 
 	int n;
 	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
+		tcp segm;
+		char *buffer;
+		buffer = malloc(8192*sizeof(char));
+
+		memset(&segm, 0, sizeof(&segm)); //initialize the struct
+		segm.sequence_number = first_byte; // sets the correct sequence number
+		first_byte = first_byte + n + 1; // sequence number for the next segment
+
+		//set the struct 
+		segm.sequence_number = first_byte;
+		segm.ack = false;
+		segm.fin = false;
+		segm.syn = false;
+		strcpy(segm.data,server_response);
 		server_response[n] = '\0';
-		write(socket_desc, server_response, n);
+		serialize_struct(buffer, segm);
+		//printf("%s\n", buffer);
+		//server_response[n] = '\0';
+		//write(socket_desc, server_response, n);
+		write(socket_desc, buffer, strlen(buffer));
 	}
 
 	close(file_desc);
@@ -123,16 +142,102 @@ int RetrieveFile(int socket_desc, char* fname) {
 			}
 		}
 		else {
+			tcp segment;
+			memset(&segment,0,sizeof(segment));
+			deserialize_struct(bufferFile, segment);
+			/*
 			bufferFile[n] = '\0';
 			write(fd, bufferFile, n);
 			if( n < BUFSIZ-2) {
 				printf("file receiving completed \n");
 				fflush(stdout);
 				break;
+			}*/
+			strcat(segment.data, "\0");
+			write(fd, bufferFile, strlen(segment.data));
+			if( n < BUFSIZ-2) {
+				printf("file receiving completed \n");
+				fflush(stdout);
+				break;
 			}
+
 		}
 	}
 	//close(conn_s);
 	close(fd);
 	return 0;		
+}
+
+// serializes the big-endian int value 
+void serialize_struct(char *buffer, tcp segment) {
+
+	if(segment.ack) {
+		strcat(buffer, "1");
+	}
+	else {
+		strcat(buffer, "0");
+	}
+	if(segment.fin) {
+		strcat(buffer, "1");
+	}
+	else {
+		strcat(buffer, "0");
+	}
+	if(segment.syn) {
+		strcat(buffer, "1");
+	}
+	else {
+		strcat(buffer, "0");
+	}
+	strcat(buffer, "\n");
+
+	sprintf(buffer, "%d", htonl(segment.sequence_number));
+	/*char *buff = malloc(strlen(segment.data)*sizeof(char));
+	strncpy(buff, segment.data, strlen(segment.data));*/
+	strcat(buffer, "\n");
+
+	strcat(buffer, segment.data);
+}
+
+void deserialize_struct(char *buffer, tcp segment) {
+	int n = 0;
+	char seq_num[4];
+	int temp;
+	int i = 0;
+	char flags[3];
+	while(buffer[n] != '\n') {
+		flags[i] = buffer[i];
+		n++;
+	}
+
+	// there is an ack in the segmment
+	if(flags[0] == '1') {
+		char ack_num[4];
+		i = 0;
+		while(buffer[n] != '\n') {
+			ack_num[i] = buffer[n];
+			n++; 
+		}
+		int temp2;
+		sscanf(ack_num, "%d", &temp2);
+		segment.ack_number = ack_num;
+		printf("Ack recived\n");
+	}
+
+	// deserialize segment number
+	while(buffer[n] != '\n') {
+		seq_num[n] = buffer[n];
+		n++; 
+	}
+	sscanf(seq_num, "%d", &temp);
+	segment.sequence_number = ntohl(temp);
+	printf("Segment number : %d\n", segment.sequence_number);
+
+
+	i = 0;
+	while(buffer[n] != '\0') {
+		segment.data[i] = buffer[n];
+		n++;
+		i++;
+	}
 }
