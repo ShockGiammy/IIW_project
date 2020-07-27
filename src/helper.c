@@ -75,12 +75,12 @@ ssize_t Writeline(int sockd, const void *vptr, size_t n)
     return n;
 }
 
-int SendFile(int socket_desc, char* file_name, char *server_response) {
+int SendFile(int socket_desc, char* file_name, char* response) {
 
 	int first_byte = 0;
 	struct stat	obj;
 
-	char path[BUFSIZ] = "DirectoryFiles/";
+	char path[100] = "DirectoryFiles/";
 	strcat(path, file_name);
 	int file_desc = open(path, O_RDONLY);
 	if (fstat(file_desc, &obj) == -1) {
@@ -93,6 +93,7 @@ int SendFile(int socket_desc, char* file_name, char *server_response) {
 	printf("opening file\n");
 
 	int n;
+<<<<<<< HEAD
 	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
 		tcp segm;
 		char *buffer;
@@ -114,6 +115,12 @@ int SendFile(int socket_desc, char* file_name, char *server_response) {
 		//server_response[n] = '\0';
 		//write(socket_desc, server_response, n);
 		write(socket_desc, buffer, strlen(buffer));
+=======
+	while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
+		response[n] = '\0';
+		write(socket_desc, response, n);
+		memset(response, 0, sizeof(char)*(strlen(response)+1));
+>>>>>>> fd836b72e66cf92d8593df73f3b319804066ab78
 	}
 
 	close(file_desc);
@@ -122,32 +129,37 @@ int SendFile(int socket_desc, char* file_name, char *server_response) {
 }
 
 int RetrieveFile(int socket_desc, char* fname) {
-	char bufferFile[BUFSIZ];
+	char retrieveBuffer[BUFSIZ];
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
 		printf("error to create file");
-		//recv(conn_s, bufferFile, BUFSIZ-1, 0);   //only to consume the socket buffer;
-		return -1;
+		//recv(conn_s, retrieveBuffer, BUFSIZ-1, 0);   //only to consume the socket buffer;
+		return 1;
 	}
 
 	int n;
-	while ((n = recv(socket_desc, bufferFile, BUFSIZ-1, 0)) > 0) {
-		if (strcmp(bufferFile, "ERROR") == 0) {
+	while ((n = recv(socket_desc, retrieveBuffer, BUFSIZ-1, 0)) > 0) {
+		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
 			if (remove(fname) != 0) {
       			printf("Unable to delete the file \n");
 				fflush(stdout);
-				return -1;
+				return 1;
 			}
 		}
 		else {
+<<<<<<< HEAD
 			tcp segment;
 			memset(&segment,0,sizeof(segment));
 			deserialize_struct(bufferFile, segment);
 			/*
 			bufferFile[n] = '\0';
 			write(fd, bufferFile, n);
+=======
+			retrieveBuffer[n] = '\0';
+			write(fd, retrieveBuffer, n);
+>>>>>>> fd836b72e66cf92d8593df73f3b319804066ab78
 			if( n < BUFSIZ-2) {
 				printf("file receiving completed \n");
 				fflush(stdout);

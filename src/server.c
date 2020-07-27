@@ -54,10 +54,11 @@ void *evadi_richiesta(void *socket_desc) {
 	memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 	printf("Connection estabilished with %s", client);
 
-	while(1) {
+	do {
 		Readline(socket, client_request, MAX_LINE-1);
-		if (strcmp(client_request, "list\n") == 0){
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+		if (strcmp(client_request, "list\n") == 0) {
+			printf("command LIST entered\n");
+			fflush(stdout);
 			
 			struct dirent *de;
 
@@ -78,10 +79,12 @@ void *evadi_richiesta(void *socket_desc) {
 			send(socket, stop, sizeof(stop), 0);
 	    	closedir(dr);
 	    	printf("file listing completed \n");
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		}
 
-		else if (strcmp(client_request, "get\n") == 0){
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+		else if (strcmp(client_request, "get\n") == 0) {
+			printf("command GET entered\n");
+			fflush(stdout);
 
 			recv(socket, filesName, 50,0);
 			printf("file name is %s \n", filesName);
@@ -94,17 +97,22 @@ void *evadi_richiesta(void *socket_desc) {
 				char error[] = "ERROR";
 				send(socket, error, sizeof(error), 0);
 			}
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		}
 
-		else if (strcmp(client_request, "put\n") == 0){
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+		else if (strcmp(client_request, "put\n") == 0) {
+			printf("command PUT entered\n");
+			fflush(stdout);
 
 			recv(socket, filesName, 50,0);
 			printf("file name is %s \n", filesName);
 
 			RetrieveFile(socket, filesName);
+			memset(filesName, 0, sizeof(char)*(strlen(filesName)+1));
+			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		}
-	}
+		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+	} while(1);
 }
 
 int main(int argc, char *argv[]) {
