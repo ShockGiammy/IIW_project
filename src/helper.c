@@ -93,6 +93,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	printf("opening file\n");
 
 	int n;
+	char server_response[8192];
 	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
 		tcp segm;
 		char *buffer;
@@ -107,26 +108,26 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 		segm.ack = false;
 		segm.fin = false;
 		segm.syn = false;
-		strcpy(segm.data,server_response);
 		server_response[n] = '\0';
-		serialize_struct(buffer, segm);
+		strcpy(segm.data,server_response);
+		serialize_struct(buffer, &segm);
 		//printf("%s\n", buffer);
 		//server_response[n] = '\0';
 		//write(socket_desc, server_response, n);
 		write(socket_desc, buffer, strlen(buffer));
-	while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
+	/*while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
 		response[n] = '\0';
 		write(socket_desc, response, n);
 		memset(response, 0, sizeof(char)*(strlen(response)+1));
-	}
+	}*/
 
-	close(file_desc);
-	//close(socket_desc);
-	return 0;
+		close(file_desc);
+		//close(socket_desc);
+		return 0;
+	}
 }
 
 int RetrieveFile(int socket_desc, char* fname) {
-	char retrieveBuffer[BUFSIZ];
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
@@ -136,6 +137,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 	}
 
 	int n;
+	char retrieveBuffer[BUFSIZ];
 	while ((n = recv(socket_desc, retrieveBuffer, BUFSIZ-1, 0)) > 0) {
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
@@ -148,7 +150,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 		else {
 			tcp segment;
 			memset(&segment,0,sizeof(segment));
-			deserialize_struct(bufferFile, segment);
+			deserialize_struct(retrieveBuffer, &segment);
 			/*
 			bufferFile[n] = '\0';
 			write(fd, bufferFile, n);
@@ -160,7 +162,8 @@ int RetrieveFile(int socket_desc, char* fname) {
 				break;
 			}*/
 			strcat(segment.data, "\0");
-			write(fd, bufferFile, strlen(segment.data));
+			printf("%s\n", segment.data);
+			write(fd, segment.data, strlen(segment.data));
 			if( n < BUFSIZ-2) {
 				printf("file receiving completed \n");
 				fflush(stdout);
@@ -175,21 +178,21 @@ int RetrieveFile(int socket_desc, char* fname) {
 }
 
 // serializes the big-endian int value 
-void serialize_struct(char *buffer, tcp segment) {
+void serialize_struct(char *buffer, tcp *segment) {
 
-	if(segment.ack) {
+	if(segment->ack) {
 		strcat(buffer, "1");
 	}
 	else {
 		strcat(buffer, "0");
 	}
-	if(segment.fin) {
+	if(segment->fin) {
 		strcat(buffer, "1");
 	}
 	else {
 		strcat(buffer, "0");
 	}
-	if(segment.syn) {
+	if(segment->syn) {
 		strcat(buffer, "1");
 	}
 	else {
@@ -197,15 +200,15 @@ void serialize_struct(char *buffer, tcp segment) {
 	}
 	strcat(buffer, "\n");
 
-	sprintf(buffer, "%d", htonl(segment.sequence_number));
+	sprintf(buffer, "%d", htonl(segment->sequence_number));
 	/*char *buff = malloc(strlen(segment.data)*sizeof(char));
 	strncpy(buff, segment.data, strlen(segment.data));*/
 	strcat(buffer, "\n");
 
-	strcat(buffer, segment.data);
+	strcat(buffer, segment->data);
 }
 
-void deserialize_struct(char *buffer, tcp segment) {
+void deserialize_struct(char *buffer, tcp *segment) {
 	int n = 0;
 	char seq_num[4];
 	int temp;
@@ -226,7 +229,7 @@ void deserialize_struct(char *buffer, tcp segment) {
 		}
 		int temp2;
 		sscanf(ack_num, "%d", &temp2);
-		segment.ack_number = ack_num;
+		segment->ack_number = temp2;
 		printf("Ack recived\n");
 	}
 
@@ -236,14 +239,14 @@ void deserialize_struct(char *buffer, tcp segment) {
 		n++; 
 	}
 	sscanf(seq_num, "%d", &temp);
-	segment.sequence_number = ntohl(temp);
-	printf("Segment number : %d\n", segment.sequence_number);
-
+	segment->sequence_number = ntohl(temp);
 
 	i = 0;
 	while(buffer[n] != '\0') {
-		segment.data[i] = buffer[n];
+		segment->data[i] = buffer[n];
 		n++;
 		i++;
 	}
+	printf("%s\n", segment->data);
+	printf("Tot byte :%ld\n", strlen(segment->data));
 }

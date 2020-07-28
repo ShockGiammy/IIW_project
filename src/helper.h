@@ -39,8 +39,8 @@ ssize_t Readline(int fd, void *vptr, size_t maxlen);
 ssize_t Writeline(int fc, const void *vptr, size_t maxlen);
 int SendFile(int socket_desc, char* file_name, char *server_response);
 int RetrieveFile(int socket_desc, char* fname);
-void serialize_struct(char *buffer, tcp segment);
-void deserialize_struct(char *buffer, tcp segment);
+void serialize_struct(char *buffer, tcp *segment);
+void deserialize_struct(char *buffer, tcp *segment);
 
 #endif  /*  PG_SOCK_HELP  */
 
