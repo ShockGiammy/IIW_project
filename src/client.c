@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
 			getchar();	// remove newline
 			send(conn_s, fname, strlen(fname), 0);
 
-			RetrieveFile(conn_s, fname);
+			RetrieveFile(conn_s, fname, false);
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 		}
 
@@ -180,13 +180,13 @@ int main(int argc, char *argv[]) {
 			send(conn_s, fname, strlen(fname), 0);
 
 
-			if (SendFile(conn_s, fname, bufferFile) == 0) {
+			if (SendFile(conn_s, fname, bufferFile, true) == 0) {
 				printf("file transfer completed \n");
 			}
 			else {
 				printf("file transfer error \n");
 				char error[] = "ERROR";
-				send(conn_s, error, sizeof(error), 0);
+				send(conn_s, error, strlen(error), 0);
 			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 		}

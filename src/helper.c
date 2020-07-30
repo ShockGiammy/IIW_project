@@ -1,5 +1,4 @@
 /*
-
   HELPER.C
   ========
   
@@ -75,7 +74,7 @@ ssize_t Writeline(int sockd, const void *vptr, size_t n)
     return n;
 }
 
-int SendFile(int socket_desc, char* file_name, char* response) {
+int SendFile(int socket_desc, char* file_name, char* response, bool is_ack) {
 
 	int first_byte = 0;
 	struct stat	obj;
@@ -91,43 +90,44 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int file_size = obj.st_size;
 
 	printf("opening file\n");
-
+	if(is_ack) {
+		recv(socket_desc, response, 6, 0); // waits for the receiver to start transmitting the file
+		if(strcmp(response, "READY") != 0) {
+			printf("Error \n");
+			exit(-1);
+		}
+	}
+	memset(response, 0, sizeof(char)*(strlen(response) +1 ));
 	int n;
-	char server_response[8192];
-	while ( (n = read(file_desc, server_response, BUFSIZ-1)) > 0) {
+	while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
 		tcp segm;
 		char *buffer;
-		buffer = malloc(8192*sizeof(char));
+		buffer = malloc(8192*sizeof(unsigned char));
 
-		memset(&segm, 0, sizeof(&segm)); //initialize the struct
-		segm.sequence_number = first_byte; // sets the correct sequence number
+		segm.sequence_number = first_byte + 1; // sets the correct sequence number
 		first_byte = first_byte + n + 1; // sequence number for the next segment
+		segm.ack_number = 1;
+		segm.reciver_window = 0;
 
-		//set the struct 
-		segm.sequence_number = first_byte;
+		//set the struct
 		segm.ack = false;
 		segm.fin = false;
 		segm.syn = false;
-		server_response[n] = '\0';
-		strcpy(segm.data,server_response);
-		serialize_struct(buffer, &segm);
-		//printf("%s\n", buffer);
-		//server_response[n] = '\0';
-		//write(socket_desc, server_response, n);
+		strcpy(segm.data,response);
+		segm.data[n] = '\0';
+		make_seg(segm, buffer);
 		write(socket_desc, buffer, strlen(buffer));
-	/*while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
-		response[n] = '\0';
-		write(socket_desc, response, n);
+		memset(buffer, 0, sizeof(char)*(strlen(buffer)+1));
 		memset(response, 0, sizeof(char)*(strlen(response)+1));
-	}*/
-
-		close(file_desc);
-		//close(socket_desc);
-		return 0;
 	}
+
+	close(file_desc);
+	//close(socket_desc);
+	return 0;
 }
 
-int RetrieveFile(int socket_desc, char* fname) {
+int RetrieveFile(int socket_desc, char* fname, bool is_ack) {
+	char retrieveBuffer[BUFSIZ];
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
@@ -135,9 +135,10 @@ int RetrieveFile(int socket_desc, char* fname) {
 		//recv(conn_s, retrieveBuffer, BUFSIZ-1, 0);   //only to consume the socket buffer;
 		return 1;
 	}
-
+	if(is_ack)
+		send(socket_desc, "READY", 5, 0); // kind of ack to tell the sender that the receiver is ready
+	
 	int n;
-	char retrieveBuffer[BUFSIZ];
 	while ((n = recv(socket_desc, retrieveBuffer, BUFSIZ-1, 0)) > 0) {
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
@@ -149,27 +150,15 @@ int RetrieveFile(int socket_desc, char* fname) {
 		}
 		else {
 			tcp segment;
-			memset(&segment,0,sizeof(segment));
-			deserialize_struct(retrieveBuffer, &segment);
-			/*
-			bufferFile[n] = '\0';
-			write(fd, bufferFile, n);
-			retrieveBuffer[n] = '\0';
-			write(fd, retrieveBuffer, n);
-			if( n < BUFSIZ-2) {
-				printf("file receiving completed \n");
-				fflush(stdout);
-				break;
-			}*/
+			extract_segment(&segment, retrieveBuffer);
 			strcat(segment.data, "\0");
-			printf("%s\n", segment.data);
 			write(fd, segment.data, strlen(segment.data));
+			retrieveBuffer[n] = '\0';
 			if( n < BUFSIZ-2) {
 				printf("file receiving completed \n");
 				fflush(stdout);
 				break;
 			}
-
 		}
 	}
 	//close(conn_s);
@@ -177,76 +166,147 @@ int RetrieveFile(int socket_desc, char* fname) {
 	return 0;		
 }
 
-// serializes the big-endian int value 
-void serialize_struct(char *buffer, tcp *segment) {
-
-	if(segment->ack) {
-		strcat(buffer, "1");
+void make_seg(tcp segment, char *send_segm) {
+	
+	int x;
+	// verify for the sequence number
+	if(segment.sequence_number != 0) {
+		sprintf(send_segm, "%d", htonl(segment.sequence_number));
+		strcat(send_segm, "\n");
 	}
 	else {
-		strcat(buffer, "0");
+		strcpy(send_segm, "0000\0"); // we send a send_num = 0, so that the recv knows taht there are no data
 	}
-	if(segment->fin) {
-		strcat(buffer, "1");
+
+	// verify for the ack
+	if(segment.ack_number != 0) {
+		char ack[10];
+		sprintf(ack, "%d", htonl(segment.ack_number));
+		strcat(send_segm, ack);
+		strcat(send_segm, "\n");
 	}
 	else {
-		strcat(buffer, "0");
+		strcat(send_segm, "0000\0");
 	}
-	if(segment->syn) {
-		strcat(buffer, "1");
+
+	// verify if there is any flag to send
+	if(segment.ack) {
+		strcat(send_segm, "1\n");
 	}
 	else {
-		strcat(buffer, "0");
+		strcat(send_segm, "0\n");
 	}
-	strcat(buffer, "\n");
+	if(segment.syn) {
+		strcat(send_segm, "1\n");
+	}
+	else {
+		strcat(send_segm, "0\n");
+	}
+	if(segment.fin) {
+		strcat(send_segm, "1\n");
+	}
+	else {
+		strcat(send_segm, "0\n");
+	}
 
-	sprintf(buffer, "%d", htonl(segment->sequence_number));
-	/*char *buff = malloc(strlen(segment.data)*sizeof(char));
-	strncpy(buff, segment.data, strlen(segment.data));*/
-	strcat(buffer, "\n");
-
-	strcat(buffer, segment->data);
+	// verify for the receiver window
+	if(segment.reciver_window != 0) {
+		char recv[10];
+		sprintf(recv, "%d", htonl(segment.reciver_window));
+		strcat(send_segm, recv);
+		strcat(send_segm, "\n");
+	}
+	else {
+		strcat(send_segm, "00\n");
+	}
+	strcat(send_segm, segment.data);
 }
 
-void deserialize_struct(char *buffer, tcp *segment) {
-	int n = 0;
-	char seq_num[4];
-	int temp;
+void extract_segment(tcp *segment, char *recv_segm) {
 	int i = 0;
-	char flags[3];
-	while(buffer[n] != '\n') {
-		flags[i] = buffer[i];
-		n++;
-	}
+	int j = 0; // usefull for indexing the struct
 
-	// there is an ack in the segmment
-	if(flags[0] == '1') {
-		char ack_num[4];
-		i = 0;
-		while(buffer[n] != '\n') {
-			ack_num[i] = buffer[n];
-			n++; 
-		}
-		int temp2;
-		sscanf(ack_num, "%d", &temp2);
-		segment->ack_number = temp2;
-		printf("Ack recived\n");
-	}
-
-	// deserialize segment number
-	while(buffer[n] != '\n') {
-		seq_num[n] = buffer[n];
-		n++; 
-	}
-	sscanf(seq_num, "%d", &temp);
-	segment->sequence_number = ntohl(temp);
-
-	i = 0;
-	while(buffer[n] != '\0') {
-		segment->data[i] = buffer[n];
-		n++;
+	//deserialize seg number
+	char seg[20];
+	while(recv_segm[i] != '\n') {
+		seg[j] = recv_segm[i];
 		i++;
+		j++;
 	}
-	printf("%s\n", segment->data);
-	printf("Tot byte :%ld\n", strlen(segment->data));
+	i++;
+	if(strcmp(seg, "0000") != 0) {
+		int seg_num;
+		sscanf(seg, "%d", &seg_num);
+		segment->sequence_number = ntohl(seg_num);
+		printf("Segment number received : %d\n", segment->sequence_number);
+	}
+	else {
+		segment->sequence_number = 0;
+	}
+	j = 0;
+
+	//deserialize ack number
+	char ack[20];
+	while(recv_segm[i] != '\n') {
+		ack[j] = recv_segm[i];
+		i++;
+		j++;
+	}
+	i++;
+	if(strcmp(ack, "0000") != 0) {
+		int ack_num;
+		sscanf(seg, "%d", &ack_num);
+		segment->ack_number = ntohl(ack_num);
+		printf("Ack number : %d\n", segment->ack_number);
+	}
+	else {
+		segment->ack_number = 0;
+	}
+	j = 0;
+
+	// deserialize flags
+	if(recv_segm[i] == '1') {
+		segment->ack = true;
+	}
+	else {
+		segment->ack = false;
+	}
+	i+=2;
+	if(recv_segm[i] == '1') {
+		segment->syn = true;
+	}
+	else {
+		segment->syn = false;
+	}
+	i+=2;
+	if(recv_segm[i] ==  '1') {
+		segment->fin = true;
+	}
+	else {
+		segment->fin = false;
+	}
+	i+=2;
+
+	int recv;
+	char rv[20];
+	while(recv_segm[i] != '\n') {
+		rv[j] = recv_segm[i];
+		i++;
+		j++;
+	}
+	i++;
+	if(strcmp(rv, "00") != 0) {
+		sscanf(rv, "%d", &recv);
+		segment->reciver_window = ntohl(recv);
+	}
+	else {
+		segment->reciver_window = 0;
+	}
+	j = 0;
+	//deserialize data
+	while(recv_segm[i] != '\0') {
+		segment->data[j] = recv_segm[i];
+		i++;
+		j++;		
+	}
 }

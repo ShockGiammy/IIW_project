@@ -1,8 +1,6 @@
 /*
-
   TCPSERVER.C
   ==========
-
 */
 /*please compile with -pthread */
 
@@ -79,7 +77,6 @@ void *evadi_richiesta(void *socket_desc) {
 			send(socket, stop, sizeof(stop), 0);
 	    	closedir(dr);
 	    	printf("file listing completed \n");
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		}
 
 		else if (strcmp(client_request, "get\n") == 0) {
@@ -89,7 +86,7 @@ void *evadi_richiesta(void *socket_desc) {
 			recv(socket, filesName, 50,0);
 			printf("file name is %s \n", filesName);
 
-			if (SendFile(socket, filesName, server_response) == 0) {
+			if (SendFile(socket, filesName, server_response, false) == 0) {
 				printf("file transfer completed \n");
 			}
 			else {
@@ -97,7 +94,6 @@ void *evadi_richiesta(void *socket_desc) {
 				char error[] = "ERROR";
 				send(socket, error, sizeof(error), 0);
 			}
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		}
 
 		else if (strcmp(client_request, "put\n") == 0) {
@@ -107,10 +103,9 @@ void *evadi_richiesta(void *socket_desc) {
 			recv(socket, filesName, 50,0);
 			printf("file name is %s \n", filesName);
 
-			RetrieveFile(socket, filesName);
-			memset(filesName, 0, sizeof(char)*(strlen(filesName)+1));
-			memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+			RetrieveFile(socket, filesName, true);
 		}
+		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
 		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 	} while(1);
 }

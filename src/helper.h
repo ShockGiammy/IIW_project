@@ -37,10 +37,10 @@ typedef struct tcp_segment
 
 ssize_t Readline(int fd, void *vptr, size_t maxlen);
 ssize_t Writeline(int fc, const void *vptr, size_t maxlen);
-int SendFile(int socket_desc, char* file_name, char *server_response);
-int RetrieveFile(int socket_desc, char* fname);
-void serialize_struct(char *buffer, tcp *segment);
-void deserialize_struct(char *buffer, tcp *segment);
+int SendFile(int socket_desc, char* file_name, char *server_response, bool is_ack);
+int RetrieveFile(int socket_desc, char* fname, bool is_ack);
+void make_seg(tcp segment, char *send_segm);
+void extract_segment(tcp *segment, char *recv_segm);
 
 #endif  /*  PG_SOCK_HELP  */
 
