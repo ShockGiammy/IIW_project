@@ -74,10 +74,12 @@ ssize_t Writeline(int sockd, const void *vptr, size_t n)
     return n;
 }
 
-int SendFile(int socket_desc, char* file_name, char* response, bool is_ack) {
+int SendFile(int socket_desc, char* file_name, char* response) {
 
 	int first_byte = 0;
 	struct stat	obj;
+	char buffer[8192]; //we use this buffer for now, we'll try to use only response buffer
+	//send_wind = malloc(6*sizeof(char*)); //we allocate 6 char *buffers to keep our segments
 
 	char path[100] = "DirectoryFiles/";
 	strcat(path, file_name);
@@ -90,43 +92,57 @@ int SendFile(int socket_desc, char* file_name, char* response, bool is_ack) {
 	int file_size = obj.st_size;
 
 	printf("opening file\n");
-	if(is_ack) {
-		recv(socket_desc, response, 6, 0); // waits for the receiver to start transmitting the file
-		if(strcmp(response, "READY") != 0) {
-			printf("Error \n");
-			exit(-1);
-		}
-	}
-	memset(response, 0, sizeof(char)*(strlen(response) +1 ));
 	int n;
-	while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
-		tcp segm;
-		char *buffer;
-		buffer = malloc(8192*sizeof(unsigned char));
+	int i;
+	tcp send_segm[7];
+	tcp recv_segm;
+	int byte_read = 0; // to count how many byte are left
+	int seg_div; //usefull to break the data into chunks
+	//while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
+	while(byte_read < file_size) {
+		memset(&send_segm, 0, sizeof(send_segm));
+		n = read(file_desc, response, BUFSIZ-1);
 
-		segm.sequence_number = first_byte + 1; // sets the correct sequence number
-		first_byte = first_byte + n + 1; // sequence number for the next segment
-		segm.ack_number = 1;
-		segm.reciver_window = 0;
-
-		//set the struct
-		segm.ack = false;
-		segm.fin = false;
-		segm.syn = false;
-		strcpy(segm.data,response);
-		segm.data[n] = '\0';
-		make_seg(segm, buffer);
-		write(socket_desc, buffer, strlen(buffer));
-		memset(buffer, 0, sizeof(char)*(strlen(buffer)+1));
+		byte_read += n;
+		// at the end of the cycle we will have our segments on the fly without any response
+		while (seg_div <= n) {
+			strncpy(send_segm[i].data, response, MSS);
+			send_segm[i].data[MSS+1] = '\0';
+			fill_struct(&send_segm[i], first_byte, 0, 0, false, false, false, NULL);
+			make_seg(send_segm[i], buffer);
+			first_byte = first_byte + MSS; // sequence number for the next segment
+			printf("%ld\n", strlen(buffer));
+			write(socket_desc, buffer, strlen(buffer));
+			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1));
+			i++;
+			seg_div += MSS;
+			response += MSS;
+		}
+		i = 0;
+		printf("N : %d\n", n);
+		while(i < n) {
+			recv(socket_desc, buffer, MSS+13, 0);
+			extract_segment(&recv_segm, buffer);
+			i += recv_segm.ack_number;
+			printf("I : %d\n", i);
+			if(recv_segm.ack_number == i) { // we received an in order segment
+				continue; //we will add the sliding window
+			}
+			memset(recv_segm.data, 0, sizeof(char)*(strlen(recv_segm.data) + 1));
+		}
 		memset(response, 0, sizeof(char)*(strlen(response)+1));
 	}
+	fill_struct(&send_segm[7], 0, 0, 0, false, false, false, "END");
+	make_seg(send_segm[7], response);
+	send(socket_desc, response, strlen(response), 0);
 
 	close(file_desc);
+	memset(response, 0, sizeof(char)*(strlen(response)+1));
 	//close(socket_desc);
 	return 0;
 }
 
-int RetrieveFile(int socket_desc, char* fname, bool is_ack) {
+int RetrieveFile(int socket_desc, char* fname) {
 	char retrieveBuffer[BUFSIZ];
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
@@ -135,11 +151,12 @@ int RetrieveFile(int socket_desc, char* fname, bool is_ack) {
 		//recv(conn_s, retrieveBuffer, BUFSIZ-1, 0);   //only to consume the socket buffer;
 		return 1;
 	}
-	if(is_ack)
-		send(socket_desc, "READY", 5, 0); // kind of ack to tell the sender that the receiver is ready
-	
 	int n;
-	while ((n = recv(socket_desc, retrieveBuffer, BUFSIZ-1, 0)) > 0) {
+	int next = 0;
+	tcp segment;
+	tcp ack;
+	//while ((n = recv(socket_desc, retrieveBuffer, BUFSIZ-1, 0)) > 0) {
+	while ((n = recv(socket_desc, retrieveBuffer, MSS+13, 0)) > 0) {
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
 			if (remove(fname) != 0) {
@@ -149,46 +166,52 @@ int RetrieveFile(int socket_desc, char* fname, bool is_ack) {
 			}
 		}
 		else {
-			tcp segment;
 			extract_segment(&segment, retrieveBuffer);
-			strcat(segment.data, "\0");
-			write(fd, segment.data, strlen(segment.data));
-			retrieveBuffer[n] = '\0';
-			if( n < BUFSIZ-2) {
+			if(strcmp(segment.data, "END") == 0) {
 				printf("file receiving completed \n");
 				fflush(stdout);
 				break;
 			}
+			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+			strcat(segment.data, "\0");
+			write(fd, segment.data, strlen(segment.data));
+			next += strlen(segment.data);
+			fill_struct(&ack, 0, next, 0, true, false, false, NULL);
+			make_seg(ack, retrieveBuffer);
+			send(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
+			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 		}
+		memset(&segment, 0, sizeof(segment));
+		memset(&ack, 0, sizeof(ack));
+		memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 	}
 	//close(conn_s);
 	close(fd);
+	memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 	return 0;		
 }
 
 void make_seg(tcp segment, char *send_segm) {
 	
-	int x;
 	// verify for the sequence number
 	if(segment.sequence_number != 0) {
-		sprintf(send_segm, "%d", htonl(segment.sequence_number));
+		sprintf(send_segm, "%0x", htonl(segment.sequence_number));
 		strcat(send_segm, "\n");
 	}
 	else {
-		strcpy(send_segm, "0000\0"); // we send a send_num = 0, so that the recv knows taht there are no data
+		strcpy(send_segm, "0000\n"); // we send a send_num = 0, so that the recv knows taht there are no data
 	}
 
 	// verify for the ack
 	if(segment.ack_number != 0) {
-		char ack[10];
-		sprintf(ack, "%d", htonl(segment.ack_number));
+		char ack[4];
+		sprintf(ack, "%0x", htonl(segment.ack_number));
 		strcat(send_segm, ack);
 		strcat(send_segm, "\n");
 	}
 	else {
-		strcat(send_segm, "0000\0");
+		strcat(send_segm, "0000\n");
 	}
-
 	// verify if there is any flag to send
 	if(segment.ack) {
 		strcat(send_segm, "1\n");
@@ -211,15 +234,20 @@ void make_seg(tcp segment, char *send_segm) {
 
 	// verify for the receiver window
 	if(segment.reciver_window != 0) {
-		char recv[10];
-		sprintf(recv, "%d", htonl(segment.reciver_window));
+		char recv[20];
+		sprintf(recv, "%0x", htonl(segment.reciver_window));
 		strcat(send_segm, recv);
 		strcat(send_segm, "\n");
 	}
 	else {
 		strcat(send_segm, "00\n");
 	}
-	strcat(send_segm, segment.data);
+	if(strcmp(segment.data, "") != 0) {
+		strcat(send_segm, segment.data);
+	}
+	else{
+		strcat(send_segm, "\0");
+	}
 }
 
 void extract_segment(tcp *segment, char *recv_segm) {
@@ -227,7 +255,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	int j = 0; // usefull for indexing the struct
 
 	//deserialize seg number
-	char seg[20];
+	char seg[4];
 	while(recv_segm[i] != '\n') {
 		seg[j] = recv_segm[i];
 		i++;
@@ -236,7 +264,8 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	i++;
 	if(strcmp(seg, "0000") != 0) {
 		int seg_num;
-		sscanf(seg, "%d", &seg_num);
+		//seg_num = (int)strtol(seg, NULL, 16);
+		sscanf(seg, "%x", &seg_num);
 		segment->sequence_number = ntohl(seg_num);
 		printf("Segment number received : %d\n", segment->sequence_number);
 	}
@@ -246,7 +275,8 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	j = 0;
 
 	//deserialize ack number
-	char ack[20];
+	char ack[4];
+	memset(ack, 0, sizeof(char)*(strlen(ack)+1));
 	while(recv_segm[i] != '\n') {
 		ack[j] = recv_segm[i];
 		i++;
@@ -255,7 +285,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	i++;
 	if(strcmp(ack, "0000") != 0) {
 		int ack_num;
-		sscanf(seg, "%d", &ack_num);
+		sscanf(ack, "%x", &ack_num);
 		segment->ack_number = ntohl(ack_num);
 		printf("Ack number : %d\n", segment->ack_number);
 	}
@@ -296,7 +326,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	}
 	i++;
 	if(strcmp(rv, "00") != 0) {
-		sscanf(rv, "%d", &recv);
+		sscanf(rv, "%x", &recv);
 		segment->reciver_window = ntohl(recv);
 	}
 	else {
@@ -308,5 +338,25 @@ void extract_segment(tcp *segment, char *recv_segm) {
 		segment->data[j] = recv_segm[i];
 		i++;
 		j++;		
+	}
+}
+
+void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data) {
+	segment->sequence_number = seq_num;
+	segment->ack_number = ack_num;
+	segment->reciver_window = recv;
+	segment->ack = is_ack;
+	segment->fin = is_fin;
+	segment->syn = is_syn;
+	if(data != NULL) {
+		strcpy(segment->data,data);
+	}
+}
+
+void copy_str(char *strdest, char *strsrc, int max) {
+	printf("Entrato\n");
+	for(int i = 0; i < max; i++) {
+		strdest[i] = strsrc[i];
+		printf("Sono qui\n");
 	}
 }

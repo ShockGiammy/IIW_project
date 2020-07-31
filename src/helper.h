@@ -7,15 +7,18 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
+#define LISTENQ        (1024)   /*  Backlog for listen()   */
+#define MSS             1500    // we define the MSS for the TCP segment as a constant value
+
 // this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 typedef struct tcp_segment
 {
-  int sequence_number;
-  int ack_number;
+  unsigned int sequence_number;
+  unsigned int ack_number;
   //int header_length;
-  int reciver_window;
+  unsigned int reciver_window;
   //int checksum;
-  char data[8192];
+  char data[MSS];
   //char cwr;
   bool syn;
   bool fin;
@@ -30,17 +33,16 @@ typedef struct tcp_segment
 
 #include <unistd.h>             /*  for ssize_t data type  */
 
-#define LISTENQ        (1024)   /*  Backlog for listen()   */
-
-
 /*  Function declarations  */
 
 ssize_t Readline(int fd, void *vptr, size_t maxlen);
 ssize_t Writeline(int fc, const void *vptr, size_t maxlen);
-int SendFile(int socket_desc, char* file_name, char *server_response, bool is_ack);
-int RetrieveFile(int socket_desc, char* fname, bool is_ack);
+int SendFile(int socket_desc, char* file_name, char *server_response);
+int RetrieveFile(int socket_desc, char* fname);
 void make_seg(tcp segment, char *send_segm);
 void extract_segment(tcp *segment, char *recv_segm);
+void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data);
+void copy_str(char *strdest, char *strsrc, int max);
 
 #endif  /*  PG_SOCK_HELP  */
 
