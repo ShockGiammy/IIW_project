@@ -93,13 +93,13 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 	printf("opening file\n");
 	int n;
-	int i;
+	int i = 0;
 	int acked;
 	tcp send_segm[7];
 	tcp recv_segm;
-	int byte_read = 0; // to count how many byte are left
-	int seg_div = 0; //usefull to break the data into chunks
-	int copied; // used to see how many byte are copied, will be usefull to restet the response buffer
+	int byte_read = 0;	// to count how many byte are left
+	int seg_div = 0;	// useful for breaking the data into chunks
+	int copied;			// used to see how many byte are copied, will be usefull to restet the response buffer
 
 	//while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
 	while(byte_read < file_size) {
@@ -206,7 +206,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 void make_seg(tcp segment, char *send_segm) {
 	
-	// verify for the sequence number
+	// check the sequence number
 	if(segment.sequence_number != 0) {
 		unsigned char seq[13];
 		sprintf(seq, "%X", htonl(segment.sequence_number));
@@ -218,7 +218,7 @@ void make_seg(tcp segment, char *send_segm) {
 		//strcpy(send_segm, "0000\n"); // we send a send_num = 0, so that the recv knows taht there are no data
 	}
 
-	// verify for the ack
+	// check ack
 	if(segment.ack_number != 0) {
 		unsigned char ack[13];
 		sprintf(ack, "%X", htonl(segment.ack_number));
@@ -256,9 +256,9 @@ void make_seg(tcp segment, char *send_segm) {
 	}
 
 	// verify for the receiver window
-	if(segment.reciver_window != 0) {
+	if(segment.receiver_window != 0) {
 		char recv[8];
-		sprintf(recv, "%X", htons(segment.reciver_window));
+		sprintf(recv, "%X", htons(segment.receiver_window));
 		concat_segm(send_segm, recv, 8);
 		//strcat(send_segm, recv);
 		//strcat(send_segm, "\n");
@@ -348,10 +348,10 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	}
 	if(strcmp(rv, "00000000") != 0) {
 		sscanf(rv, "%X", &recv);
-		segment->reciver_window = ntohl(recv);
+		segment->receiver_window = ntohl(recv);
 	}
 	else {
-		segment->reciver_window = 0;
+		segment->receiver_window = 0;
 	}
 	j = 0;
 	//deserialize data
@@ -365,7 +365,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data) {
 	segment->sequence_number = seq_num;
 	segment->ack_number = ack_num;
-	segment->reciver_window = recv;
+	segment->receiver_window = recv;
 	segment->ack = is_ack;
 	segment->fin = is_fin;
 	segment->syn = is_syn;
