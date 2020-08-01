@@ -125,7 +125,6 @@ int main(int argc, char *argv[]) {
 	show_menu();
 
 	tcp client_segm;
-	memset(&client_segm, 0, sizeof(client_segm));
 	int acked = 0;
 	do{
 		/*if(recv(conn_s, exitBuffer, 10,0) <= 0) {
@@ -163,10 +162,10 @@ int main(int argc, char *argv[]) {
 			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			recv(conn_s, command, BUFSIZ-1, 0);
+			recv(conn_s, command, 100, 0);
 			extract_segment(&client_segm, command);
 			if(!(client_segm.ack_number == acked+1)) {
-				printf("Command lost\n");
+				printf("Command lost due to ack %d\n", client_segm.ack_number);
 				exit(EXIT_FAILURE);
 			}
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
@@ -177,7 +176,7 @@ int main(int argc, char *argv[]) {
 			send(conn_s, fname, strlen(fname), 0);
 			acked = acked + strlen(fname);
 
-			recv(conn_s, command, BUFSIZ-1, 0);
+			recv(conn_s, command, 100, 0);
 			extract_segment(&client_segm,command);
 			if(!(client_segm.ack_number == acked + 1)) {
 				printf("File name lost\n");
@@ -197,10 +196,10 @@ int main(int argc, char *argv[]) {
 			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			recv(conn_s, command, BUFSIZ-1, 0);
+			recv(conn_s, command, 100, 0);
 			extract_segment(&client_segm, command);
 			if(!(client_segm.ack_number == acked+1)) {
-				printf("Command lost\n");
+				printf("Command lost due to ack : %d\n", client_segm.ack_number);
 				exit(EXIT_FAILURE);
 			}
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
@@ -212,7 +211,7 @@ int main(int argc, char *argv[]) {
 
 			acked = acked + strlen(fname);
 
-			recv(conn_s, command, BUFSIZ-1, 0);
+			recv(conn_s, command, 100, 0);
 			extract_segment(&client_segm,command);
 			if(!(client_segm.ack_number == acked + 1)) {
 				printf("File name lost\n");
@@ -229,6 +228,7 @@ int main(int argc, char *argv[]) {
 				send(conn_s, error, strlen(error), 0);
 			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
+			acked = 0;
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
@@ -240,6 +240,7 @@ int main(int argc, char *argv[]) {
 			printf("Command not valid\n");
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 		}
+		memset(&client_segm, 0, sizeof(client_segm));
 	}while(1);
 }
 
