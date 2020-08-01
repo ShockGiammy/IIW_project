@@ -85,7 +85,7 @@ void *evadi_richiesta(void *socket_desc) {
 			fflush(stdout);
 			
 			// sets the segment
-			fill_struct(&temp, 0, strlen(client_request) + 1, 0, true, false, false, NULL);
+			fill_struct(&temp, 0,strlen(client_request) + 1, 0, true, false, false, NULL);
 			make_seg(temp,server_response);
 			send(socket, server_response, strlen(server_response), 0); // sends the ack
 			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1)); // reset the buffer
@@ -129,6 +129,8 @@ void *evadi_richiesta(void *socket_desc) {
 		}
 		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
 		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+		memset(&temp, 0, sizeof(temp));
+		memset(server_response, 0, sizeof(char)*(strlen(server_response) + 1));
 	} while(1);
 }
 
