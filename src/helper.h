@@ -19,7 +19,7 @@ typedef struct tcp_segment
   unsigned int sequence_number;
   unsigned int ack_number;
   //int header_length;
-  unsigned int reciver_window;
+  unsigned int receiver_window;
   //int checksum;
   char data[MSS];
   //char cwr;
