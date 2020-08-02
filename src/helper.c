@@ -79,7 +79,6 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int first_byte = 0;
 	struct stat	obj;
 	char buffer[8192]; //we use this buffer for now, we'll try to use only response buffer
-	//send_wind = malloc(6*sizeof(char*)); //we allocate 6 char *buffers to keep our segments
 
 	char path[100] = "DirectoryFiles/";
 	strcat(path, file_name);
@@ -92,64 +91,66 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int file_size = obj.st_size;
 
 	printf("opening file\n");
-	int n;
-	int i;
-	int acked;
-	tcp send_segm[7];
-	tcp recv_segm;
-	int byte_read = 0; // to count how many byte are left
-	int seg_div = 0; //usefull to break the data into chunks
-	int copied; // used to see how many byte are copied, will be usefull to restet the response buffer
+	int n = 0; // used to keep trace of the number of bytes that we are reading
+	int i = 0; // for tcp struct indexing
+	int k;
+	tcp send_segm[8]; // keeps the segment that we send, so that we can perform resending and/or acknoledg.
+	tcp recv_segm; // used to unpack the ack and see if everything was good
+	int n_acked;
+	int n_read = 0;
+	slid_win sender_wind; //sliding window for the sender
+	memset(&sender_wind, 0, sizeof(sender_wind)); // we initialize the struct to all 0s
+	sender_wind.max_size = MAX_WIN; //we accept at most BUFSIZ bytes on the fly at the same time
 
-	//while ( (n = read(file_desc, response, BUFSIZ-1)) > 0) {
-	while(byte_read < file_size) {
-		n = read(file_desc, response, BUFSIZ-1);
-		printf("Lunghezza %ld\n", strlen(response));
-
-		byte_read += n;
-
-		// at the end of the cycle we will have our segments on the fly without any response
-		while (seg_div <= n) {
-			//strncpy(send_segm[i].data, response, MSS);
-			copied = copy_with_ret(send_segm[i].data, response, MSS);
-			printf("Prova %ld\n", strlen(send_segm[i].data));
+	while((n = read(file_desc, response, MSS)) > 0 || sender_wind.acked < file_size) {
+		
+		n_read += n;
+		// we check if we can send data without exceeding the max number of bytes on the fly
+		if(sender_wind.on_the_fly <= sender_wind.max_size && n > 0) {
+			memset(&send_segm[i], 0, sizeof(send_segm[i]));
+			printf("%d\n", i);
+			strncpy(send_segm[i].data, response, MSS);
 			send_segm[i].data[MSS+1] = '\0';
-			fill_struct(&send_segm[i], first_byte, 0, 0, false, false, false, NULL);
-			make_seg(send_segm[i], buffer);
-			first_byte = first_byte + MSS; // sequence number for the next segment
-			printf("Controllo lunghezza segmento tcp %ld\n", strlen(buffer));
+			fill_struct(&send_segm[i], sender_wind.next_seq_num, 0, 0, false, false, false, NULL);
+			sender_wind.next_seq_num += strlen(send_segm[i].data); // sequence number for the next segment
+			sender_wind.n_seg++;
+			sender_wind.on_the_fly += n;
+			sender_wind.last += n;
+			make_seg(send_segm[i], buffer); // we put our segment in a buffer that will be sent over the socket
 			write(socket_desc, buffer, strlen(buffer));
-			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1));
-			i++;
-			response += copied;
-			seg_div += MSS;
+			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
+			memset(response, 0, sizeof(char)*(strlen(response)+1)); // we reset the buffer so taht we can reuse it
+			i = (i+1)%7;
+			printf("Finestra : [%d  %d]\n", sender_wind.first, sender_wind.last);
 		}
-		i = 0;
-		while(acked < byte_read) {
-			recv(socket_desc, buffer, 37, 0);
+		// we have read the max number of data, we proceed with the sending in pipelining
+		if(sender_wind.on_the_fly == sender_wind.max_size || n_read == file_size) {
+
+			sender_wind.n_seg = 0;
+
+			recv(socket_desc, buffer, 37, 0); //we expect a buffer with only header and no data
 			extract_segment(&recv_segm, buffer);
-			acked = recv_segm.ack_number;
-			if(recv_segm.ack_number == acked) { // we received an in order segment
-				continue; //we will add the sliding window
-			}
-			memset(&recv_segm, 0, sizeof(recv_segm));
 			memset(buffer, 0, sizeof(char)*(strlen(buffer) + 1));
-		}
-		acked = 0;
-		seg_div = 0;
-		memset(buffer, 0, sizeof(char)*(strlen(buffer) + 1));
-		response -= n;
-		memset(response, 0, sizeof(char)*(strlen(response)+1));
-		for(int k = 0; k <=6; k++) {
-			memset(send_segm[i].data, 0, sizeof(char)*(strlen(send_segm[i].data) + 1));
+			if(sender_wind.first <= recv_segm.ack_number <= sender_wind.last) { //we check if we received a segment in order
+				sender_wind.next_to_ack = recv_segm.ack_number;
+				n_acked = count_acked(sender_wind.first, recv_segm.ack_number); 
+				sender_wind.on_the_fly -= MSS; // we scale the number of byte acked from the max
+				sender_wind.acked = recv_segm.ack_number;
+				sender_wind.first = recv_segm.ack_number;
+				i = (i+1)%7;
+			}
+			memset(recv_segm.data, 0, sizeof(char)*(strlen(recv_segm.data) + 1));
+			memset(response, 0, sizeof(char)*(strlen(response)+1));
+			for(k = 0; k < n_acked; k++) {
+				memset(send_segm[k].data, 0, sizeof(char)*(strlen(send_segm[k].data) + 1));
+			}
 		}
 	}
+
 	fill_struct(&send_segm[7], 0, 0, 0, false, false, false, "END");
 	make_seg(send_segm[7], response);
 	send(socket_desc, response, strlen(response), 0);
-
 	close(file_desc);
-	response -= n;
 	memset(response, 0, sizeof(char)*(strlen(response)+1));
 	//close(socket_desc);
 	return 0;
@@ -185,14 +186,17 @@ int RetrieveFile(int socket_desc, char* fname) {
 				fflush(stdout);
 				break;
 			}
-			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
-			strcat(segment.data, "\0");
-			write(fd, segment.data, strlen(segment.data));
-			next += strlen(segment.data);
-			fill_struct(&ack, 0, next, 0, true, false, false, NULL);
-			make_seg(ack, retrieveBuffer);
-			send(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
-			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+			else {
+				memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+				strcat(segment.data, "\0");
+				write(fd, segment.data, strlen(segment.data));
+				next += strlen(segment.data);
+				fill_struct(&ack, 0, next, 0, true, false, false, NULL);
+				make_seg(ack, retrieveBuffer);
+				send(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
+				printf("Riscontro il seg %d\n", segment.sequence_number);
+				memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+			}
 		}
 		memset(&segment, 0, sizeof(segment));
 		memset(&ack, 0, sizeof(ack));
@@ -281,6 +285,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 
 	//deserialize seg number
 	char seg[15];
+	memset(seg, 0, sizeof(char)*(strlen(seg)+1));
 	while(i < 13) {
 		seg[j] = recv_segm[i];
 		i++;
@@ -300,6 +305,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 
 	//deserialize ack number
 	char ack[15];
+	memset(ack, 0, sizeof(char)*(strlen(ack)+1));
 	while(i <= 25) {
 		ack[j] = recv_segm[i];
 		i++;
@@ -340,7 +346,8 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	i++;
 
 	int recv;
-	char rv[20];
+	char rv[15];
+	memset(rv, 0, sizeof(char)*(strlen(rv)+1));
 	while(i < 37) {
 		rv[j] = recv_segm[i];
 		i++;
@@ -393,4 +400,12 @@ int copy_with_ret(char * dest, char *src, int max) {
 		ncopied++;
 	}
 	return ncopied;
+}
+
+int count_acked (int min, int acked) {
+	int n_ack = 0;
+	for(int j = min; j < acked; j+=1500) {
+		n_ack++;
+	}
+	return n_ack;
 }
