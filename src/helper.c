@@ -94,65 +94,76 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int n = 0; // used to keep trace of the number of bytes that we are reading
 	int i = 0; // for tcp struct indexing
 	int k;
-	tcp send_segm[8]; // keeps the segment that we send, so that we can perform resending and/or acknoledg.
+	tcp send_segm[7]; // keeps the segment that we send, so that we can perform resending and/or acknoledg.
 	tcp recv_segm; // used to unpack the ack and see if everything was good
-	int n_acked;
+	//int n_acked; // this variable shows us how many segments have been acked within the same ack
 	int n_read = 0;
 	slid_win sender_wind; //sliding window for the sender
 	memset(&sender_wind, 0, sizeof(sender_wind)); // we initialize the struct to all 0s
 	sender_wind.max_size = MAX_WIN; //we accept at most BUFSIZ bytes on the fly at the same time
+	
+	struct timeval time_out;
+	time_out.tv_sec = 5; // we set 3 sec of timeout, we will estimate it in another moment
+	if(setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out)) == -1) {
+		printf("Sender error setting opt\n");
+	}
 
-	while((n = read(file_desc, response, MSS)) > 0 || sender_wind.acked < file_size) {
-		
+	while((n = read(file_desc, response, MSS)) > 0 || sender_wind.tot_acked < file_size) {
 		n_read += n;
+
 		// we check if we can send data without exceeding the max number of bytes on the fly
 		if(sender_wind.on_the_fly <= sender_wind.max_size && n > 0) {
-			memset(&send_segm[i], 0, sizeof(send_segm[i]));
-			printf("%d\n", i);
-			strncpy(send_segm[i].data, response, MSS);
-			send_segm[i].data[MSS+1] = '\0';
-			fill_struct(&send_segm[i], sender_wind.next_seq_num, 0, 0, false, false, false, NULL);
-			sender_wind.next_seq_num += strlen(send_segm[i].data); // sequence number for the next segment
-			sender_wind.n_seg++;
-			sender_wind.on_the_fly += n;
-			sender_wind.last += n;
+			prepare_segment(send_segm, &sender_wind, response, i, n);
 			make_seg(send_segm[i], buffer); // we put our segment in a buffer that will be sent over the socket
 			write(socket_desc, buffer, strlen(buffer));
 			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
 			memset(response, 0, sizeof(char)*(strlen(response)+1)); // we reset the buffer so taht we can reuse it
-			i = (i+1)%7;
-			printf("Finestra : [%d  %d]\n", sender_wind.first, sender_wind.last);
+			i = (i+1)%6;
 		}
+
 		// we have read the max number of data, we proceed with the sending in pipelining
 		if(sender_wind.on_the_fly == sender_wind.max_size || n_read == file_size) {
+			if(recv(socket_desc, buffer, 37, 0) > 0) { //we expect a buffer with only header and no data
+				extract_segment(&recv_segm, buffer);
+				memset(buffer, 0, sizeof(char)*(strlen(buffer) + 1));
 
-			sender_wind.n_seg = 0;
+				//we check if we received a segment in order
+				if(sender_wind.next_to_ack <= recv_segm.ack_number <= sender_wind.last_to_ack) {
+					slide_window(&sender_wind, &recv_segm);
+				}
 
-			recv(socket_desc, buffer, 37, 0); //we expect a buffer with only header and no data
-			extract_segment(&recv_segm, buffer);
-			memset(buffer, 0, sizeof(char)*(strlen(buffer) + 1));
-			if(sender_wind.first <= recv_segm.ack_number <= sender_wind.last) { //we check if we received a segment in order
-				sender_wind.next_to_ack = recv_segm.ack_number;
-				n_acked = count_acked(sender_wind.first, recv_segm.ack_number); 
-				sender_wind.on_the_fly -= MSS; // we scale the number of byte acked from the max
-				sender_wind.acked = recv_segm.ack_number;
-				sender_wind.first = recv_segm.ack_number;
-				i = (i+1)%7;
+				// we received an ack out of order, which is a duplicate ack
+				else {
+					if(recv_segm.ack_number == sender_wind.last_correctly_acked) {
+						sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+						
+						//fast retransmission
+						if(sender_wind.dupl_ack == 3) {
+							printf("Fast retx\n");
+							retx(send_segm, sender_wind, buffer, socket_desc);
+						}
+					}
+				}
+			}
+
+			// we have to retx the last segment not acked due to TO
+			else {
+				printf("TO expired\n");
+				retx(send_segm, sender_wind, buffer, socket_desc);
 			}
 			memset(recv_segm.data, 0, sizeof(char)*(strlen(recv_segm.data) + 1));
 			memset(response, 0, sizeof(char)*(strlen(response)+1));
-			for(k = 0; k < n_acked; k++) {
-				memset(send_segm[k].data, 0, sizeof(char)*(strlen(send_segm[k].data) + 1));
+			for(k = 0; k < sender_wind.n_seg; k++) {
+				memset(&send_segm[(i+k)%6], 0, sizeof(send_segm[(i+k)%6]));
+				memset(send_segm[(i+k)%6].data, 0, sizeof(char)*(strlen(send_segm[(i+k)%6].data) + 1));
 			}
 		}
 	}
-
 	fill_struct(&send_segm[7], 0, 0, 0, false, false, false, "END");
 	make_seg(send_segm[7], response);
 	send(socket_desc, response, strlen(response), 0);
 	close(file_desc);
 	memset(response, 0, sizeof(char)*(strlen(response)+1));
-	//close(socket_desc);
 	return 0;
 }
 
@@ -162,15 +173,24 @@ int RetrieveFile(int socket_desc, char* fname) {
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
 		printf("error to create file");
-		//recv(conn_s, retrieveBuffer, BUFSIZ-1, 0);   //only to consume the socket buffer;
 		return 1;
 	}
 
 	int n;
-	int next = 0;
+	tcp buf_segm[7];
 	tcp segment;
 	tcp ack;
+	slid_win recv_win; // the sliding wondow for the receiver
+	int list_length = 0; 
+	recv_win.next_to_ack = 0;
+	recv_win.last_to_ack = 7500;
+	
+	// we set 0.5 sec of timeout, we will estimate it in another moment
+	struct timeval recv_timeout;
+	bool got_second = false; // usefull to know if we got another segment
+
 	while ((n = recv(socket_desc, retrieveBuffer, MSS+37, 0)) > 0) {
+
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
 			if (remove(fname) != 0) {
@@ -181,28 +201,85 @@ int RetrieveFile(int socket_desc, char* fname) {
 		}
 		else {
 			extract_segment(&segment, retrieveBuffer);
+			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 			if(strcmp(segment.data, "END") == 0) {
 				printf("file receiving completed \n");
 				fflush(stdout);
 				break;
 			}
 			else {
-				memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
-				strcat(segment.data, "\0");
-				write(fd, segment.data, strlen(segment.data));
-				next += strlen(segment.data);
-				fill_struct(&ack, 0, next, 0, true, false, false, NULL);
-				make_seg(ack, retrieveBuffer);
+				// we can still buffer segments
+				if(list_length < MAX_BUF_SIZE) {
+					strcat(segment.data, "\0");
+					buffer_in_order(list_length, buf_segm, segment, &recv_win);
+					// the segment is in order
+					if(segment.sequence_number == recv_win.next_to_ack) {
+						recv_win.next_to_ack+=strlen(segment.data); // now we expect this sequence number
+					}
+					list_length++;
+				}
+				recv_timeout.tv_sec = 0;
+				recv_timeout.tv_usec = 500000;
+				if(setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
+					printf("Error while setting options");
+				}
+
+				// we are in delayed ack and check if we get a new segment 
+				if(recv(socket_desc, retrieveBuffer, MSS+37, 0) > 0) {
+					
+					//we got the new segment
+					memset(&segment, 0, sizeof(segment));
+					extract_segment(&segment, retrieveBuffer);
+					memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+					
+					//check if this is an EOF message 
+					if(strcmp(segment.data, "END") == 0) {
+						if(list_length != 0) {
+
+							// writes all the data still in buffer
+							ack_segments(fd, &list_length, buf_segm, &ack,  &recv_win, retrieveBuffer);
+						}
+						else {
+							printf("file receiving completed \n");
+							fflush(stdout);
+							break;
+						}
+					}
+
+					else if(list_length < MAX_BUF_SIZE) {
+						got_second = true;
+						strcat(segment.data, "\0");
+						buffer_in_order(list_length, buf_segm, segment, &recv_win);
+						list_length++;
+					}
+				}
+
+				// we received a segment in order;
+				if(got_second && segment.sequence_number == recv_win.next_to_ack) {
+					recv_win.next_to_ack += strlen(segment.data);
+					ack_segments(fd, &list_length, buf_segm, &ack,  &recv_win, retrieveBuffer);
+					got_second = false;
+				}
+				else if(!got_second) {
+					ack_segments(fd, &list_length, buf_segm, &ack,  &recv_win, retrieveBuffer);
+				}
+				// we received a segment out of order
+				else if(recv_win.next_to_ack < segment.sequence_number <= recv_win.last_to_ack){
+					printf("Invio riscontro duplicato\n");
+					fill_struct(&ack, 0, recv_win.last_correctly_acked, 0, true, false, false, NULL);
+					make_seg(ack, retrieveBuffer);
+				}
 				send(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
-				printf("Riscontro il seg %d\n", segment.sequence_number);
 				memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+				recv_timeout.tv_sec = 0;
+				recv_timeout.tv_usec = 0;
+				setsockopt(socket_desc, SOL_SOCKET, SO_SNDTIMEO, (char *)&recv_timeout, sizeof(recv_timeout));
+				memset(&segment, 0, sizeof(segment));
 			}
 		}
-		memset(&segment, 0, sizeof(segment));
 		memset(&ack, 0, sizeof(ack));
 		memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 	}
-	//close(conn_s);
 	close(fd);
 	memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 	return 0;		
@@ -215,11 +292,9 @@ void make_seg(tcp segment, char *send_segm) {
 		unsigned char seq[13];
 		sprintf(seq, "%X", htonl(segment.sequence_number));
 		concat_segm(send_segm, seq, 13);
-		//strcat(send_segm, seq);
 	}
 	else {
 		strcat(send_segm, "0000000000000");
-		//strcpy(send_segm, "0000\n"); // we send a send_num = 0, so that the recv knows taht there are no data
 	}
 
 	// check ack
@@ -227,36 +302,28 @@ void make_seg(tcp segment, char *send_segm) {
 		unsigned char ack[13];
 		sprintf(ack, "%X", htonl(segment.ack_number));
 		concat_segm(send_segm, ack, 13);
-		//strcat(send_segm, ack);
 	}
 	else {
 		strcat(send_segm, "0000000000000");
-		//strcat(send_segm, "0000\n");
 	}
 	// verify if there is any flag to send
 	if(segment.ack) {
 		strcat(send_segm, "1");
-		//strcat(send_segm, "1\n");
 	}
 	else {
 		strcat(send_segm, "0");
-		//strcat(send_segm, "0\n");
 	}
 	if(segment.syn) {
 		strcat(send_segm, "1");
-		//strcat(send_segm, "1\n");
 	}
 	else {
 		strcat(send_segm, "0");
-		//strcat(send_segm, "0\n");
 	}
 	if(segment.fin) {
 		strcat(send_segm, "1");
-		//strcat(send_segm, "1\n");
 	}
 	else {
 		strcat(send_segm, "0");
-		//strcat(send_segm, "0\n");
 	}
 
 	// verify for the receiver window
@@ -264,12 +331,9 @@ void make_seg(tcp segment, char *send_segm) {
 		char recv[8];
 		sprintf(recv, "%X", htons(segment.receiver_window));
 		concat_segm(send_segm, recv, 8);
-		//strcat(send_segm, recv);
-		//strcat(send_segm, "\n");
 	}
 	else {
 		strcat(send_segm, "00000000");
-		//strcat(send_segm, "00\n");
 	}
 	if(strcmp(segment.data, "") != 0) {
 		strcat(send_segm, segment.data);
@@ -390,22 +454,94 @@ void concat_segm(char *segm, char *to_concat, int max) {
 	strcat(segm, to_concat); //last, we concat the data
 }
 
-// this function will return the exact number of bytes that have been copied from src to dest
-int copy_with_ret(char * dest, char *src, int max) {
-	int i = 0;
-	int ncopied = 0;
-	while(i < max && src[i] != '\0') {
-		dest[i] = src[i];
-		i++;
-		ncopied++;
+int count_acked (int min, int max, int acknum) {
+	int n_ack;
+	int j = 0;
+
+	for(n_ack = ceil(min/MSS); n_ack <= ceil(max/MSS); n_ack++) {
+		if(n_ack == ceil(acknum/MSS))
+			return j;
+		else
+			j++;
 	}
-	return ncopied;
 }
 
-int count_acked (int min, int acked) {
-	int n_ack = 0;
-	for(int j = min; j < acked; j+=1500) {
-		n_ack++;
+// function called when it's necessary to retx a segment with TCP fast retx
+void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
+	for(int i = 0; i < 6; i++) {
+		if(win.next_to_ack == segments[i].sequence_number) {
+			make_seg(segments[i], buffer);
+			write(socket_desc, buffer, strlen(buffer));
+			printf("Ritrasmetto segmento con numero di sequenza %d\n", segments[i].sequence_number);
+			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
+			break;
+		}
 	}
-	return n_ack;
+}
+
+
+void buffer_in_order(int list_size, tcp *segment_head, tcp to_buf, slid_win *win) {
+	if(list_size == 0){
+		segment_head[0] = to_buf;
+	}
+	for(int i = 0; i <= list_size-1; i++) {
+		if(segment_head[i].sequence_number < to_buf.sequence_number) {
+			//tcp temp;
+			//temp = segment_head[i];
+			segment_head[i+1] = to_buf;
+			//segment_head[i+1] = temp;
+		}
+	}
+}
+
+// we call this function to write eventually out of order segments
+void write_all(int fd, int list_size, tcp *segm_buff, slid_win *win) {
+	for(int i = 0; i < list_size; i++) {
+		write(fd, segm_buff[i].data, strlen(segm_buff[i].data));
+		win->last_to_ack += strlen(segm_buff[i].data);
+		win->last_correctly_acked = segm_buff[i].sequence_number;
+		win->tot_acked += strlen(segm_buff[i].data);
+		//free the segments
+		memset(&segm_buff[i], 0, sizeof(segm_buff));
+	}
+}
+
+// function used to prepare a segemnt that will be send and to set the window parameters properly
+void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int n_byte) {
+	memset(&segment[index], 0, sizeof(segment[index]));
+	strncpy(segment[index].data, data, MSS);
+	segment[index].data[MSS+1] = '\0';
+	fill_struct(&segment[index], wind->next_seq_num, 0, 0, false, false, false, NULL);
+	wind->next_seq_num += strlen(segment[index].data); // sequence number for the next segment
+	wind->on_the_fly += n_byte;
+	wind->last_to_ack += n_byte;
+	//make_seg(segment[index], buffer); // we put our segment in a buffer that will be sent over the socket
+}
+
+// function used to move the sliding window properly
+void slide_window(slid_win *wind, tcp *recv_segm) {
+	wind->n_seg = count_acked(wind->next_to_ack, wind->last_to_ack, recv_segm->ack_number);
+	wind->on_the_fly -= wind->n_seg*MSS; // we scale the number of byte acked from the max
+	wind->tot_acked = recv_segm->ack_number;
+	wind->next_to_ack = recv_segm->ack_number;
+	wind->last_correctly_acked = recv_segm->ack_number -wind->n_seg*MSS;//abs((sender_wind.last_correctly_acked-recv_segm.ack_number))
+	+wind->last_correctly_acked;
+}
+
+// function that writes all the segments in order received and reset the buffered segments list length
+void ack_segments(int fd, int *list_length, tcp *buf_segm, tcp *ack,  slid_win *recv_win, char *retrieveBuffer) {
+	write_all(fd, *list_length,  buf_segm, recv_win);
+	*list_length = 0;
+	fill_struct(ack, 0, recv_win->tot_acked, 0, true, false, false, NULL);
+	make_seg(*ack, retrieveBuffer);
+}
+
+// this function will act a situation in which it is possible to lost segments or acks
+void send_unreliable(char *segm_to_go, int sockd) {
+	int p = rand() % 10;
+
+	// 30% of possibility to lost the segment
+	if(p != 0 && p != 1 && p != 2) {
+		send(sockd, segm_to_go, strlen(segm_to_go), 0);
+	}
 }
