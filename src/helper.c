@@ -4,7 +4,6 @@
   
 */
 
-#include "helper.h"
 #include <sys/socket.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -18,6 +17,9 @@
 #include <sys/stat.h>   	  /*  stat for files transfer   */
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
+#include "helper.h"
+
+#define MAX_LINE  4096
 
 
 /*  Read a line from a socket  */
@@ -408,4 +410,77 @@ int count_acked (int min, int acked) {
 		n_ack++;
 	}
 	return n_ack;
+}
+
+int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len){
+	char server_response[BUFSIZ];
+	int res;
+	if((res = connect(socket_descriptor, addr, INET_ADDRSTRLEN)) < 0){
+		char str_addr[INET_ADDRSTRLEN];
+		inet_ntop(addr->sa_family, addr->sa_data, str_addr, addr_len);
+		fprintf(stderr, "Could not connect to: %s\n", str_addr);
+		return res;
+	}
+
+	Writeline(socket_descriptor, "SYN", 3);
+	printf("SYN sent...\n");
+
+	do{
+		printf("Waiting server response...\n");
+		Readline(socket_descriptor, server_response, MAX_LINE -1);
+		printf("expecting SYN-ACK, received: %s\n", server_response);
+	}
+	while(strcmp(server_response, "SYN-ACK") != 0);
+
+	if(strcmp(server_response, "SYN-ACK") != 0){
+		fprintf(stderr, "Could not establish connection with server, response: %s\n", server_response);
+		res = -1;
+		return res;
+	}
+
+	Writeline(socket_descriptor, "ACK", 3);
+	printf("Received SYN-ACK, sent ACK...\n");
+
+	res = 0;
+	return res;
+
+}
+
+int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len){
+	char client_message[MAX_LINE];
+
+	int conn_sd = accept(socket_descriptor, addr, addr_len);
+
+	if(conn_sd < 0){
+		fprintf(stderr, "error during accept\n");
+		return -1;
+	}
+
+	do{
+		Readline(conn_sd, client_message, MAX_LINE -1);
+	}
+	while(strcmp(client_message, "SYN") != 0);
+
+	if(strcmp(client_message, "SYN") == 0){
+		Writeline(conn_sd, "SYN-ACK", 7);
+		printf("server: received SYN, sent SYN-ACK...\n");
+	}
+	else {
+		fprintf(stderr, "server: expected SYN but received %s\n", client_message);
+		return -1;
+	}
+	
+	do{
+		Readline(conn_sd, client_message, MAX_LINE -1);
+	}
+	while(strcmp(client_message, "ACK") != 0);
+
+	if(strcmp(client_message, "ACK") != 0){
+		printf("server: missing ACK, terminating...\n");
+		return -1;
+	}
+	
+	printf("server: received ACK, connection established\n");
+
+	return conn_sd;
 }
