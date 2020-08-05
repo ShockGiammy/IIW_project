@@ -425,12 +425,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len
 	Writeline(socket_descriptor, "SYN", 3);
 	printf("SYN sent...\n");
 
-	do{
-		printf("Waiting server response...\n");
-		Readline(socket_descriptor, server_response, MAX_LINE -1);
-		printf("expecting SYN-ACK, received: %s\n", server_response);
-	}
-	while(strcmp(server_response, "SYN-ACK") != 0);
+	printf("Waiting server response...\n");
+	Readline(socket_descriptor, server_response, MAX_LINE -1);
 
 	if(strcmp(server_response, "SYN-ACK") != 0){
 		fprintf(stderr, "Could not establish connection with server, response: %s\n", server_response);
@@ -442,6 +438,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len
 	printf("Received SYN-ACK, sent ACK...\n");
 
 	res = 0;
+	fflush(stdout);
 	return res;
 
 }
@@ -456,10 +453,7 @@ int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len
 		return -1;
 	}
 
-	do{
-		Readline(conn_sd, client_message, MAX_LINE -1);
-	}
-	while(strcmp(client_message, "SYN") != 0);
+	Readline(conn_sd, client_message, MAX_LINE -1);
 
 	if(strcmp(client_message, "SYN") == 0){
 		Writeline(conn_sd, "SYN-ACK", 7);
@@ -470,10 +464,7 @@ int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len
 		return -1;
 	}
 	
-	do{
-		Readline(conn_sd, client_message, MAX_LINE -1);
-	}
-	while(strcmp(client_message, "ACK") != 0);
+	Readline(conn_sd, client_message, MAX_LINE -1);
 
 	if(strcmp(client_message, "ACK") != 0){
 		printf("server: missing ACK, terminating...\n");
@@ -481,6 +472,6 @@ int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len
 	}
 	
 	printf("server: received ACK, connection established\n");
-
+	fflush(stdout);
 	return conn_sd;
 }

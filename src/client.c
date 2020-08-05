@@ -130,8 +130,8 @@ int main(int argc, char *argv[]) {
 		printf("Errore fgets\n");
 		if(close(conn_s) == -1) {
 			printf("Errore close \n");
-			exit(-1);
 		}
+		exit(EXIT_FAILURE);
 	}
 
 	Writeline(conn_s, username, strlen(username));
