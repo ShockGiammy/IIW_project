@@ -559,7 +559,6 @@ void send_unreliable(char *segm_to_go, int sockd) {
 	if(p != 0 && p != 1 && p != 2) {
 		send(sockd, segm_to_go, strlen(segm_to_go), 0);
 	}
-	return n_ack;
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len){
