@@ -16,6 +16,7 @@
 #define LISTENQ        (1024)   /*  Backlog for listen()   */
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define MAX_WIN         9000
+#define SOCKET_TYPE     SOCK_STREAM
 #define MAX_BUF_SIZE    6
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
@@ -68,6 +69,10 @@ void make_seg(tcp segment, char *send_segm);
 void extract_segment(tcp *segment, char *recv_segm);
 void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data);
 void concat_segm(char *segm, char *to_concat, int max);
+int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len);
+int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
+int close_client_tcp(int sockd);
+int close_server_tcp(int sockd);
 int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);
 void buffer_in_order(int list_size, tcp *segment_head, tcp to_buf, slid_win *win);
@@ -75,7 +80,7 @@ void write_all(int fd, int list_size, tcp *segm_buff, slid_win *win);
 void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte);
 void slide_window(slid_win *wind, tcp *recv_segm);
 void ack_segments(int fd, int *list_length, tcp *buf_segm, tcp *ack,  slid_win *recv_win, char *retrieveBuffer);
-
 void send_unreliable(char *segm_to_go, int sockd);
+
 #endif  /*  PG_SOCK_HELP  */
 

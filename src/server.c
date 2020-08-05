@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include "manage_client.h"
 #include <dirent.h>
+#include <netinet/tcp.h>
 
 #define MAX_LINE	1000
 
@@ -48,13 +49,19 @@ void *evadi_richiesta(void *socket_desc) {
 	int socket = *(int*)socket_desc;
 	free((int*)socket_desc);
 
-	Readline(socket, client_request, MAX_LINE-1);
+	int res = Readline(socket, client_request, MAX_LINE-1);
+	if(res < 0){
+		res = 0;
+		pthread_exit(&res);
+	}
+
 	strcpy(client, client_request);
 	memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
-	printf("Connection estabilished with %s", client);
+	printf("Connection estabilished with %s\n", client);
 
 	do {
 		Readline(socket, client_request, MAX_LINE-1);
+		
 		if (strcmp(client_request, "list\n") == 0) {
 			printf("command LIST entered\n");
 			fflush(stdout);
@@ -127,6 +134,19 @@ void *evadi_richiesta(void *socket_desc) {
 
 			RetrieveFile(socket, filesName);
 		}
+		else if(strcmp(client_request, "quit\n") == 0){
+			int retval;
+			printf("Closing connection with client %s", client);
+			if(close(socket) < 0){
+				printf("...Failure\n");
+				retval = EXIT_FAILURE;
+				fprintf(stderr, "Error while closing socket\n");
+				pthread_exit(&retval);
+			}
+			printf("...Success\n");
+			retval = EXIT_SUCCESS;
+			pthread_exit(&retval);
+		}
 		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
 		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
 		memset(&temp, 0, sizeof(temp));
@@ -155,10 +175,17 @@ int main(int argc, char *argv[]) {
 	
 	/*  Create the listening socket  */
 
-    if ( (list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-	fprintf(stderr, "server: errore nella creazione della socket.\n");
-	exit(EXIT_FAILURE);
+    if ( (list_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
+		fprintf(stderr, "server: errore nella creazione della socket.\n");
+		exit(EXIT_FAILURE);
     }
+
+	int yes = 1;
+	int result = setsockopt(list_s,
+                        IPPROTO_TCP,
+                        TCP_NODELAY,
+                        (char *) &yes, 
+                        sizeof(int));    // 1 - on, 0 - off
 
 
     /*  Set all bytes in socket address structure to
@@ -206,9 +233,9 @@ int main(int argc, char *argv[]) {
 		int *conn = malloc(sizeof(int));
 		/*  Wait for a connection, then accept() it  */
 		sin_size = sizeof(struct sockaddr_in);
-		if ( (conn_s = accept(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
+		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
 		    fprintf(stderr, "server: errore nella accept.\n");
-	    	    exit(EXIT_FAILURE);
+	    	continue;
 		}
 		*conn = conn_s;
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {

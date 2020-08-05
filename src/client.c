@@ -8,11 +8,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
-#include "helper.h"
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include "helper.h"
+#include <netinet/tcp.h>
 
 #define MAX_LINE  4096
 #define STDIN 0
@@ -41,8 +42,7 @@ void show_menu();
 
 void _handler(int sigo) {
 	printf("\nChiuso \n");
-	Writeline(conn_s, "quit", 5);
-	if(close(conn_s) == -1) {
+	if(close_client_tcp(conn_s) == -1) {
 		printf("Errore close \n");
 		exit(-1);
 	}
@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
 	char fname[BUFSIZ];
 	char exitBuffer[10];
 	char username[40];
+	char server_response[BUFSIZ];
 
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -74,10 +75,17 @@ int main(int argc, char *argv[]) {
 
     /*  Create the listening socket  */
 
-    if ((conn_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
+    if ((conn_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
 		fprintf(stderr, "client: errore durante la creazione della socket.\n");
 		exit(EXIT_FAILURE);
     }
+
+	int yes = 1;
+	int result = setsockopt(conn_s,
+                        IPPROTO_TCP,
+                        TCP_NODELAY,
+                        (char *) &yes, 
+                        sizeof(int));    // 1 - on, 0 - off
 
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
@@ -99,7 +107,12 @@ int main(int argc, char *argv[]) {
     }
    	signal(SIGINT,_handler);
     /*  connect() to the remote server  */
-    if ( connect(conn_s, (struct sockaddr *) &servaddr, sizeof(servaddr) ) < 0 ) {
+	char address_string[INET_ADDRSTRLEN];
+	inet_ntop(servaddr.sin_family, &servaddr.sin_addr, address_string, INET_ADDRSTRLEN);
+	printf("Instauro connessione con %s\n", address_string);
+    
+	socklen_t addr_len = INET_ADDRSTRLEN;
+	if ( connect_tcp(conn_s, (struct sockaddr*) &servaddr, addr_len ) < 0 ) {
 		printf("client: errore durante la connect.\n");
 		exit(EXIT_FAILURE);
     }
@@ -111,17 +124,18 @@ int main(int argc, char *argv[]) {
 	}*/
 
 	/* connessione */
-	printf("Inserire nome utente :");
+	printf("Inserire nome utente: ");
 	if(fgets(username,39,stdin) == NULL) {
 		printf("Errore fgets\n");
 		if(close(conn_s) == -1) {
 			printf("Errore close \n");
-			exit(-1);
 		}
+		exit(EXIT_FAILURE);
 	}
+
 	Writeline(conn_s, username, strlen(username));
 
-	printf("Benvenuto nel server %s\n", username);
+	printf("Welcome to the server, %s\n", username);
 	show_menu();
 
 	tcp client_segm;
