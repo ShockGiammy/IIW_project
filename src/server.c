@@ -11,7 +11,6 @@
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
 
-#include "helper.h"           /*  our own helper functions  */
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,9 +21,11 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <fcntl.h>
-#include "manage_client.h"
 #include <dirent.h>
 #include <netinet/tcp.h>
+#include "reliable_udp.h"
+#include "helper.h"           /*  our own helper functions  */
+#include "manage_client.h"
 
 #define MAX_LINE	1000
 
