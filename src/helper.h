@@ -65,6 +65,9 @@ int copy_with_ret(char * dest, char *src, int max);
 int count_acked (int min, int acked);
 int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len);
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
+int close_client_tcp(int sockd);
+int close_server_tcp(int sockd);
+
 
 #endif  /*  PG_SOCK_HELP  */
 

@@ -42,11 +42,10 @@ void show_menu();
 
 void _handler(int sigo) {
 	printf("\nChiuso \n");
-	// Writeline(conn_s, "quit\n", 5);
-	// if(close(conn_s) == -1) {
-	// 	printf("Errore close \n");
-	// 	exit(-1);
-	// }
+	if(close_client_tcp(conn_s) == -1) {
+		printf("Errore close \n");
+		exit(-1);
+	}
 	exit(0);
 }
 

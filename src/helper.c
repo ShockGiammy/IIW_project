@@ -35,7 +35,7 @@ ssize_t Readline(int sockd, void *vptr, size_t maxlen)
 		rc = read(sockd, &c, 1);
 		if ( rc == 1 ) {
 	    		*buffer++ = c;
-	    		if ( c == '\n' ) break;
+	    		if ( c == '\n' || c == 0) break;
 		}
 		else
 			if ( rc == 0 ) {
@@ -48,6 +48,15 @@ ssize_t Readline(int sockd, void *vptr, size_t maxlen)
 			}
     }
     *buffer = 0;
+
+	if(strcmp(vptr, "FIN") == 0){
+		int res;
+		if((res = close_server_tcp(sockd)) < 0){
+			fprintf(stderr, "received FIN but could not close connection\n");
+			return -2;
+		}
+		return -1;
+	}
     return n;
 }
 
@@ -73,7 +82,11 @@ ssize_t Writeline(int sockd, const void *vptr, size_t n)
 		nleft  -= nwritten;
 		buffer += nwritten;
     }
-    return n;
+	char end = 0;
+	do{nleft = write(sockd, &end, 1);}
+	while(nleft == 0);
+    
+	return n;
 }
 
 int SendFile(int socket_desc, char* file_name, char* response) {
@@ -423,7 +436,6 @@ int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len
 	}
 
 	Writeline(socket_descriptor, "SYN", 3);
-	printf("SYN sent...\n");
 
 	printf("Waiting server response...\n");
 	Readline(socket_descriptor, server_response, MAX_LINE -1);
@@ -435,10 +447,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len
 	}
 
 	Writeline(socket_descriptor, "ACK", 3);
-	printf("Received SYN-ACK, sent ACK...\n");
 
 	res = 0;
-	fflush(stdout);
 	return res;
 
 }
@@ -457,7 +467,6 @@ int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len
 
 	if(strcmp(client_message, "SYN") == 0){
 		Writeline(conn_sd, "SYN-ACK", 7);
-		printf("server: received SYN, sent SYN-ACK...\n");
 	}
 	else {
 		fprintf(stderr, "server: expected SYN but received %s\n", client_message);
@@ -471,7 +480,42 @@ int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len
 		return -1;
 	}
 	
-	printf("server: received ACK, connection established\n");
-	fflush(stdout);
+	printf("server: connection established\n");
 	return conn_sd;
+}
+
+int close_client_tcp(int sockd){
+	char response[MAX_LINE];
+
+	Writeline(sockd, "FIN", 3);
+
+	Readline(sockd, response, MAX_LINE);
+	
+	if(strcmp(response, "FIN-ACK") != 0){
+		fprintf(stderr, "Could not close connection...\n");
+		return -1;
+	}
+
+	Writeline(sockd, "ACK", 3);
+
+	int res = close(sockd);
+	printf("Connection closed\n");
+	return res;
+}
+
+int close_server_tcp(int sockd){
+	char response[MAX_LINE];
+
+	Writeline(sockd, "FIN-ACK", 7);
+
+	Readline(sockd, response, MAX_LINE);
+	if(strcmp(response, "ACK") != 0 ){
+		fprintf(stderr, "Could not close connection...\n");
+		return -1;
+	}
+
+	int res = close(sockd);
+	
+	printf("Connection closed\n");
+	return res;
 }
