@@ -20,5 +20,3 @@
 
 int SendFile(int socket_desc, char* file_name, char *server_response);
 int RetrieveFile(int socket_desc, char* fname);
-
-
