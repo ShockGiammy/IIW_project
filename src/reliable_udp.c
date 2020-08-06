@@ -312,6 +312,15 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int 
 	wind->last_to_ack += n_byte;
 }
 
+int set_last_correctly_acked(tcp *recv_segm, tcp *segm) {
+	for(int i = 0; i < 6; i++) {
+		if((segm[i].sequence_number + strlen(segm[i].data)) == recv_segm->ack_number) {
+			//printf("Segmento in pos %d, ultimo acked in pos %d \n", i, (i+5)%6);
+			return segm[i].sequence_number;
+		}
+	}
+}
+
 // function used to move the sliding window properly
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments) {
 	wind->n_seg = count_acked(wind->next_to_ack, wind->last_to_ack, recv_segm->ack_number);
@@ -321,14 +330,6 @@ void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments) {
 	wind->last_correctly_acked = set_last_correctly_acked(recv_segm, segments);//recv_segm->ack_number;
 }
 
-int set_last_correctly_acked(tcp *recv_segm, tcp *segm) {
-	for(int i = 0; i < 6; i++) {
-		if((segm[i].sequence_number + strlen(segm[i].data)) == recv_segm->ack_number) {
-			//printf("Segmento in pos %d, ultimo acked in pos %d \n", i, (i+5)%6);
-			return segm[i].sequence_number;
-		}
-	}
-}
 
 
 // function that writes all the segments in order received and reset the buffered segments list length
