@@ -11,7 +11,6 @@
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
 
-#include "helper.h"           /*  our own helper functions  */
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,9 +21,11 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <fcntl.h>
-#include "manage_client.h"
 #include <dirent.h>
 #include <netinet/tcp.h>
+#include "reliable_udp.h"
+#include "helper.h"           /*  our own helper functions  */
+#include "manage_client.h"
 
 #define MAX_LINE	1000
 
@@ -49,7 +50,7 @@ void *evadi_richiesta(void *socket_desc) {
 	int socket = *(int*)socket_desc;
 	free((int*)socket_desc);
 
-	int res = Readline(socket, client_request, MAX_LINE-1);
+	int res = recv_tcp(socket, client_request, MAX_LINE-1);
 	if(res < 0){
 		res = 0;
 		pthread_exit(&res);
@@ -60,7 +61,7 @@ void *evadi_richiesta(void *socket_desc) {
 	printf("Connection estabilished with %s\n", client);
 
 	do {
-		Readline(socket, client_request, MAX_LINE-1);
+		recv_tcp(socket, client_request, MAX_LINE-1);
 		
 		if (strcmp(client_request, "list\n") == 0) {
 			printf("command LIST entered\n");
@@ -72,17 +73,17 @@ void *evadi_richiesta(void *socket_desc) {
 		    if (dr == NULL) {
 	    		char result[50] = "Could not open current directory\n";
 		    	printf("%s\n", result);
-	        	send(socket, result, sizeof(result), 0);
+	        	send_tcp(socket, result, sizeof(result), 0);
 	    	}
 
 			while ((de = readdir(dr)) != NULL){
     	        char string[50];
         	    strcpy(string, de->d_name);
 	        	printf("%s\n", string);
-			    send(socket, string, sizeof(string), 0);
+			    send_tcp(socket, string, sizeof(string) + 1, 0);
     		}
 			char stop[] = "STOP";
-			send(socket, stop, sizeof(stop), 0);
+			send_tcp(socket, stop, sizeof(stop) +1, 0);
 	    	closedir(dr);
 	    	printf("file listing completed \n");
 		}
@@ -94,15 +95,15 @@ void *evadi_richiesta(void *socket_desc) {
 			// sets the segment
 			fill_struct(&temp, 0,strlen(client_request) + 1, 0, true, false, false, NULL);
 			make_seg(temp,server_response);
-			send(socket, server_response, strlen(server_response), 0); // sends the ack
+			send_tcp(socket, server_response, strlen(server_response), 0); // sends the ack
 			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1)); // reset the buffer
 			
-			recv(socket, filesName, 50,0);
+			recv_tcp(socket, filesName, 50);
 			printf("file name is %s \n", filesName);
 
 			temp.ack_number += strlen(filesName);
 			make_seg(temp, server_response);
-			send(socket, server_response, strlen(server_response), 0);
+			send_tcp(socket, server_response, strlen(server_response), 0);
 			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1));
 
 			if (SendFile(socket, filesName, server_response) == 0) {
@@ -121,15 +122,15 @@ void *evadi_richiesta(void *socket_desc) {
 
 			fill_struct(&temp, 0, strlen(client_request) + 1, 0, true, false, false, "");
 			make_seg(temp,server_response);
-			send(socket, server_response, strlen(server_response), 0); // sends the ack
+			send_tcp(socket, server_response, strlen(server_response), 0); // sends the ack
 			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1)); // reset the buffer
 
-			recv(socket, filesName, 50,0);
+			recv_tcp(socket, filesName, 50);
 			printf("file name is %s \n", filesName);
 
 			temp.ack_number += strlen(filesName);
 			make_seg(temp, server_response);
-			send(socket, server_response, strlen(server_response), 0);
+			send_tcp(socket, server_response, strlen(server_response), 0);
 			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1));
 
 			RetrieveFile(socket, filesName);
@@ -171,7 +172,7 @@ int main(int argc, char *argv[]) {
 	    exit(EXIT_FAILURE);
 	}
     
-	printf("Server in ascolto sulla porta %d\n",port);
+	printf("Server in ascolto sulla porta %d\n\n\n",port);
 	
 	/*  Create the listening socket  */
 
@@ -235,7 +236,7 @@ int main(int argc, char *argv[]) {
 		sin_size = sizeof(struct sockaddr_in);
 		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
 		    fprintf(stderr, "server: errore nella accept.\n");
-	    	continue;
+	    	break;
 		}
 		*conn = conn_s;
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
