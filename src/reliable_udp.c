@@ -16,8 +16,11 @@
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include "helper.h"
 #include "reliable_udp.h"
+#include <pthread.h>
 
 #define MAX_LINE  4096
+#define MAX_LINE_DECOR 30
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 
 void make_seg(tcp segment, char *send_segm) {
@@ -95,7 +98,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 		//seg_num = (int)strtol(seg, NULL, 16);
 		sscanf(seg, "%X", &seg_num);
 		segment->sequence_number = ntohl(seg_num);
-		printf("Segment number received : %d\n", segment->sequence_number);
+		//printf("Segment number received : %d\n", segment->sequence_number);
 	}
 	else {
 		segment->sequence_number = 0;
@@ -114,7 +117,7 @@ void extract_segment(tcp *segment, char *recv_segm) {
 		int ack_num;
 		sscanf(ack, "%X", &ack_num);
 		segment->ack_number = ntohl(ack_num);
-		printf("Ack number : %d\n", segment->ack_number);
+		//printf("Ack number : %d\n", segment->ack_number);
 	}
 	else {
 		segment->ack_number = 0;
@@ -207,7 +210,7 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	for(int i = 0; i < 6; i++) {
 		if(win.next_to_ack == segments[i].sequence_number) {
 			make_seg(segments[i], buffer);
-			write(socket_desc, buffer, strlen(buffer));
+			send_tcp(socket_desc, buffer, strlen(buffer), 0);
 			printf("Ritrasmetto segmento con numero di sequenza %d\n", segments[i].sequence_number);
 			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
 			break;
@@ -282,97 +285,209 @@ void send_unreliable(char *segm_to_go, int sockd) {
 	}
 }
 
+int send_tcp(int sockd, void* buf, size_t size, int flags){
+	bool ack, syn, fin;
+	char send_buf[BUFSIZ];
+	memset(send_buf, 0, BUFSIZ);
+	tcp temp = (const tcp) { 0 };
+
+	ack = CHECK_BIT(flags, 0);
+	syn = CHECK_BIT(flags, 1);
+	fin = CHECK_BIT(flags, 2);
+
+	fill_struct(&temp, 0, 0, 0, ack, fin, syn, buf);
+	make_seg(temp, send_buf);
+
+	//printf("Sending: %s\n\n%s\n", buf, send_buf);
+
+	int ret = send(sockd, send_buf, strlen(send_buf)+1, 0);
+	return ret;
+}
+
+void recv_tcp_segm(int sockd, tcp* dest_segm){
+	char recv_buf[BUFSIZ];
+	
+	int n = recv(sockd, recv_buf, BUFSIZ, 0);
+
+	if(n == -1){
+		perror(strerror(errno));
+	}
+	
+	extract_segment(dest_segm, recv_buf);
+}
+
+int recv_tcp(int sockd, char* buf, size_t size){
+	tcp recv_segment = (const tcp) { 0 };
+	char recv_buf[BUFSIZ];
+
+	read(sockd, recv_buf, BUFSIZ);
+
+	extract_segment(&recv_segment, recv_buf);
+	int n = strlen(recv_segment.data) + 1;
+	n = (n<size) * n + (n>size) * size;
+	memcpy(buf, recv_segment.data, n);
+	
+	//printf("Received (%d bytes): %s\n\n%s", n, recv_segment.data, buf);
+
+	if(recv_segment.fin && !recv_segment.ack){
+		close_server_tcp(sockd);
+	}
+
+	return n;
+}
+
 int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len){
-	char server_response[BUFSIZ];
-	int res;
-	if((res = connect(socket_descriptor, addr, INET_ADDRSTRLEN)) < 0){
+	tcp temp;
+	temp = (const tcp) { 0 };
+
+	if((connect(socket_descriptor, addr, INET_ADDRSTRLEN)) < 0){
 		char str_addr[INET_ADDRSTRLEN];
 		inet_ntop(addr->sa_family, addr->sa_data, str_addr, addr_len);
 		fprintf(stderr, "Could not connect to: %s\n", str_addr);
-		return res;
+		return -1;
 	}
 
-	Writeline(socket_descriptor, "SYN", 3);
+	for(int i=0; i< MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\nEnstablishing connection...\n");
+
+	printf("Opened socket, sending Syn...\n");
+
+	if( send_tcp(socket_descriptor, NULL, 0, Syn) < 0 ){
+		perror("Error while sending syn...\n");
+		return -1;
+	}
 
 	printf("Waiting server response...\n");
-	Readline(socket_descriptor, server_response, MAX_LINE -1);
+	recv_tcp_segm(socket_descriptor, &temp);
 
-	if(strcmp(server_response, "SYN-ACK") != 0){
-		fprintf(stderr, "Could not establish connection with server, response: %s\n", server_response);
-		res = -1;
-		return res;
+	if((temp.syn & temp.ack) == 0){
+		perror("No SYN-ACK from the other end\n");
+		return -1;
 	}
 
-	Writeline(socket_descriptor, "ACK", 3);
+	printf("Received Syn-Ack, sending Ack...\n");
 
-	res = 0;
-	return res;
+	if( send_tcp(socket_descriptor, NULL, 0, Ack) < 0 ){
+		perror("Error while sending ack...\n");
+		return -1;
+	}
+
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
+
+	return 0;
 
 }
 
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len){
-	char client_message[MAX_LINE];
-
+	
+	tcp temp = (const tcp) { 0 };
 	int conn_sd = accept(socket_descriptor, addr, addr_len);
 
 	if(conn_sd < 0){
-		fprintf(stderr, "error during accept\n");
+		perror("error during accept\n");
 		return -1;
 	}
 
-	Readline(conn_sd, client_message, MAX_LINE -1);
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
 
-	if(strcmp(client_message, "SYN") == 0){
-		Writeline(conn_sd, "SYN-ACK", 7);
+	recv_tcp_segm(conn_sd, &temp);
+
+	if(temp.syn){
+		printf("Received Syn, sending Syn-Ack...\n");
+		send_tcp(conn_sd, NULL, 0, Syn | Ack);
 	}
 	else {
-		fprintf(stderr, "server: expected SYN but received %s\n", client_message);
+		perror("Missing SYN\n");
 		return -1;
 	}
 	
-	Readline(conn_sd, client_message, MAX_LINE -1);
+	temp = (const tcp) { 0 };
+	recv_tcp_segm(conn_sd, &temp);
+	
+	if(!temp.ack){
+		printf("Received Ack...\n");
+		perror("Missing ACK, terminating...\n");
+		return -1;
+	}
 
-	if(strcmp(client_message, "ACK") != 0){
-		printf("server: missing ACK, terminating...\n");
-		return -1;
-	}
+	printf("Connection established\n");
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
 	
-	printf("server: connection established\n");
 	return conn_sd;
 }
 
 int close_client_tcp(int sockd){
-	char response[MAX_LINE];
+	tcp temp = (const tcp) { 0 };
 
-	Writeline(sockd, "FIN", 3);
-
-	Readline(sockd, response, MAX_LINE);
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\nConnection termination\n");
 	
-	if(strcmp(response, "FIN-ACK") != 0){
-		fprintf(stderr, "Could not close connection...\n");
+	printf("Sending Fin...\n");
+	send_tcp(sockd, NULL, 0, Fin);
+
+	recv_tcp_segm(sockd, &temp);
+
+	if((temp.fin & temp.ack) == 0){
+		perror("Missing fin-ack, could not close connection...\n");
 		return -1;
 	}
 
-	Writeline(sockd, "ACK", 3);
+	printf("Received Fin-Ack, sending Ack...\n");
+
+	if ( send_tcp(sockd, NULL, 0, Ack) < 0 ){
+		perror("Failed to send ack, could not close connection...\n");
+		return -1;
+	}
 
 	int res = close(sockd);
 	printf("Connection closed\n");
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
+	
 	return res;
 }
 
-int close_server_tcp(int sockd){
+void close_server_tcp(int sockd){
+	tcp temp = (const tcp) { 0 };
+	int res = -1;
+
 	char response[MAX_LINE];
 
-	Writeline(sockd, "FIN-ACK", 7);
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
 
-	Readline(sockd, response, MAX_LINE);
-	if(strcmp(response, "ACK") != 0 ){
-		fprintf(stderr, "Could not close connection...\n");
-		return -1;
+	printf("Received Fin, closing connection...\nSending Fin-Ack...\n");
+
+	if( send_tcp(sockd, NULL, 0, Fin | Ack) < 0){
+		perror("Failed to send fin-ack, could not close connection\n");
+		pthread_exit(&res);
+
 	}
 
-	int res = close(sockd);
+	recv_tcp_segm(sockd, &temp);
+	if( !temp.ack ){
+		perror("Missing ack, could not close connection...\n");
+		pthread_exit(&res);
+	}
+
+	printf("Received Ack\n");
+
+	res = close(sockd);
 	
 	printf("Connection closed\n");
-	return res;
+	for(int i=0; i < MAX_LINE_DECOR; i++)
+		printf("-");
+	printf("\n");
+
+	pthread_exit(&res);
 }

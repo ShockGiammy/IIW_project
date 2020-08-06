@@ -19,6 +19,10 @@
 #define SOCKET_TYPE     SOCK_STREAM
 #define MAX_BUF_SIZE    6
 
+/* Custom FLAGS for send_tcp */
+#define SYN 0
+#define FIN 1
+#define ACK 2
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 
@@ -54,7 +58,12 @@ typedef struct sliding_window {
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
 } slid_win;
 
-
+/* flags for send_tcp */
+enum flags {
+  Ack = 1 << 0,
+  Syn = 1 << 1,
+  Fin = 1 << 2
+};
 
 #ifndef PG_SOCK_HELP
 #define PG_SOCK_HELP
@@ -62,8 +71,10 @@ typedef struct sliding_window {
 /*  Function declarations  */
 int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len);
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
+int recv_tcp(int sockd, char* buf, size_t size);
+int send_tcp(int sockd, void* buf, size_t size, int flags);
 int close_client_tcp(int sockd);
-int close_server_tcp(int sockd);
+void close_server_tcp(int sockd);
 void make_seg(tcp segment, char *send_segm);
 void extract_segment(tcp *segment, char *recv_segm);
 void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data);

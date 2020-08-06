@@ -25,70 +25,6 @@
 
 /*  Read a line from a socket  */
 
-ssize_t Readline(int sockd, void *vptr, size_t maxlen)
-{
-    ssize_t n, rc;
-    char    c, *buffer;
-
-    buffer = vptr;
-
-    for ( n = 1; n < maxlen; n++ ) {
-		rc = read(sockd, &c, 1);
-		if ( rc == 1 ) {
-	    		*buffer++ = c;
-	    		if ( c == '\n' || c == 0) break;
-		}
-		else
-			if ( rc == 0 ) {
-			    if ( n == 1 ) return 0;
-			    else break;
-			}
-			else {
-			    if ( errno == EINTR ) continue;
-			    return -1;
-			}
-    }
-    *buffer = 0;
-
-	if(strcmp(vptr, "FIN") == 0){
-		int res;
-		if((res = close_server_tcp(sockd)) < 0){
-			fprintf(stderr, "received FIN but could not close connection\n");
-			return -2;
-		}
-		return -1;
-	}
-    return n;
-}
-
-
-/*  Write a line to a socket  */
-
-ssize_t Writeline(int sockd, const void *vptr, size_t n)
-{
-    size_t      nleft;
-    ssize_t     nwritten;
-    const char *buffer;
-
-    buffer = vptr;
-    nleft  = n;
-
-    while ( nleft > 0 )
-	{
-		if ( (nwritten = write(sockd, buffer, nleft)) <= 0 )
-		{
-	    	if ( errno == EINTR ) nwritten = 0;
-		    else return -1;
-		}
-		nleft  -= nwritten;
-		buffer += nwritten;
-    }
-	char end = 0;
-	do{nleft = write(sockd, &end, 1);}
-	while(nleft == 0);
-    
-	return n;
-}
 
 int SendFile(int socket_desc, char* file_name, char* response) {
 
@@ -131,7 +67,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 		if(sender_wind.on_the_fly <= sender_wind.max_size && n > 0) {
 			prepare_segment(send_segm, &sender_wind, response, i, n);
 			make_seg(send_segm[i], buffer); // we put our segment in a buffer that will be sent over the socket
-			write(socket_desc, buffer, strlen(buffer));
+			send_tcp(socket_desc, buffer, strlen(buffer), 0);
 			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
 			memset(response, 0, sizeof(char)*(strlen(response)+1)); // we reset the buffer so taht we can reuse it
 			i = (i+1)%6;
@@ -139,7 +75,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 		// we have read the max number of data, we proceed with the sending in pipelining
 		if(sender_wind.on_the_fly == sender_wind.max_size || n_read == file_size) {
-			if(recv(socket_desc, buffer, 37, 0) > 0) { //we expect a buffer with only header and no data
+			if(recv_tcp(socket_desc, buffer, 37) > 0) { //we expect a buffer with only header and no data
 				extract_segment(&recv_segm, buffer);
 				memset(buffer, 0, sizeof(char)*(strlen(buffer) + 1));
 
@@ -177,7 +113,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	}
 	fill_struct(&send_segm[7], 0, 0, 0, false, false, false, "END");
 	make_seg(send_segm[7], response);
-	send(socket_desc, response, strlen(response), 0);
+	send_tcp(socket_desc, response, strlen(response), 0);
 	close(file_desc);
 	memset(response, 0, sizeof(char)*(strlen(response)+1));
 	return 0;
@@ -205,7 +141,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 	struct timeval recv_timeout;
 	bool got_second = false; // usefull to know if we got another segment
 
-	while ((n = recv(socket_desc, retrieveBuffer, MSS+37, 0)) > 0) {
+	while ((n = recv_tcp(socket_desc, retrieveBuffer, MSS+37)) > 0) {
 
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
@@ -241,7 +177,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 				}
 
 				// we are in delayed ack and check if we get a new segment 
-				if(recv(socket_desc, retrieveBuffer, MSS+37, 0) > 0) {
+				if(recv_tcp(socket_desc, retrieveBuffer, MSS+37) > 0) {
 					
 					//we got the new segment
 					memset(&segment, 0, sizeof(segment));
@@ -285,7 +221,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 					fill_struct(&ack, 0, recv_win.last_correctly_acked, 0, true, false, false, NULL);
 					make_seg(ack, retrieveBuffer);
 				}
-				send(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
+				send_tcp(socket_desc, retrieveBuffer, strlen(retrieveBuffer), 0);
 				memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 				recv_timeout.tv_sec = 0;
 				recv_timeout.tv_usec = 0;
