@@ -157,7 +157,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		if(strcmp(command, "list\n") == 0) {
-			Writeline(conn_s, command, strlen(command));
+			//Writeline(conn_s, command, strlen(command));
+			send(conn_s, command, strlen(command), 0);
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 			printf("Files in the current directory : \n");
 			for(;;){
@@ -173,7 +174,8 @@ int main(int argc, char *argv[]) {
 
 		else if(strcmp(command,"get\n") == 0) {
 			acked = 4;
-			Writeline(conn_s, command, strlen(command));
+			//Writeline(conn_s, command, strlen(command));
+			send(conn_s, command, strlen(command), 0);
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			recv(conn_s, command, 100, 0);
@@ -207,7 +209,8 @@ int main(int argc, char *argv[]) {
 			acked = 4;
 			char bufferFile[BUFSIZ];
 
-			Writeline(conn_s, command, strlen(command));
+			//Writeline(conn_s, command, strlen(command));
+			send(conn_s, command, strlen(command), 0);
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			recv(conn_s, command, 100, 0);
