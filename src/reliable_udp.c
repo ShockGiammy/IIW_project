@@ -24,6 +24,8 @@
 
 
 void make_seg(tcp segment, char *send_segm) {
+
+	//printf("make_seg input: %s\n\n", send_segm);
 	
 	// check the sequence number
 	if(segment.sequence_number != 0) {
@@ -35,6 +37,8 @@ void make_seg(tcp segment, char *send_segm) {
 		strcat(send_segm, "0000000000000");
 	}
 
+	//printf("1)\n%s\n", send_segm);
+
 	// check ack
 	if(segment.ack_number != 0) {
 		unsigned char ack[13];
@@ -44,6 +48,9 @@ void make_seg(tcp segment, char *send_segm) {
 	else {
 		strcat(send_segm, "0000000000000");
 	}
+
+	//printf("2)\n%s\n", send_segm);
+
 	// verify if there is any flag to send
 	if(segment.ack) {
 		strcat(send_segm, "1");
@@ -64,6 +71,8 @@ void make_seg(tcp segment, char *send_segm) {
 		strcat(send_segm, "0");
 	}
 
+	//printf("3)\n%s\n", send_segm);
+
 	// verify for the receiver window
 	if(segment.receiver_window != 0) {
 		char recv[8];
@@ -79,6 +88,9 @@ void make_seg(tcp segment, char *send_segm) {
 	else{
 		strcat(send_segm, "\0");
 	}
+
+
+	//printf("4)\n%s\n", send_segm);
 }
 
 void extract_segment(tcp *segment, char *recv_segm) {
@@ -181,7 +193,7 @@ void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, 
 	segment->fin = is_fin;
 	segment->syn = is_syn;
 	if(data != NULL) {
-		strcpy(segment->data,data);
+		strncpy(segment->data,data, MSS);
 	}
 }
 
@@ -212,7 +224,7 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	for(int i = 0; i < 6; i++) {
 		if(win.next_to_ack == segments[i].sequence_number) {
 			make_seg(segments[i], buffer);
-			send(socket_desc, buffer, strlen(buffer), 0);
+			send_tcp(socket_desc, buffer, strlen(buffer), 0);
 			printf("Ritrasmetto segmento con numero di sequenza %d\n", segments[i].sequence_number);
 			memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
 			break;
@@ -391,12 +403,17 @@ int send_tcp(int sockd, void* buf, size_t size, int flags){
 	syn = CHECK_BIT(flags, 1);
 	fin = CHECK_BIT(flags, 2);
 
+	//printf("send_tcp before call, send_buf: %s\n", send_buf);
+
 	fill_struct(&temp, 0, 0, 0, ack, fin, syn, buf);
 	make_seg(temp, send_buf);
+	
+	printf("Sending(%d bytes): \n%s\n\nEND\n\n", strlen(send_buf) + 1, send_buf);
 
-	//printf("Sending: %s\n\n%s\n", buf, send_buf);
+	int ret = send(sockd, send_buf, strlen(send_buf) + 1, 0);
 
-	int ret = send(sockd, send_buf, strlen(send_buf)+1, 0);
+	printf("Sent %d bytes...\n", ret);
+
 	return ret;
 }
 
@@ -414,16 +431,18 @@ void recv_tcp_segm(int sockd, tcp* dest_segm){
 
 int recv_tcp(int sockd, char* buf, size_t size){
 	tcp recv_segment = (const tcp) { 0 };
+	memset(recv_segment.data, 0, MSS + 1);
 	char recv_buf[BUFSIZ];
+	memset(recv_buf, 0, BUFSIZ);
 
-	read(sockd, recv_buf, BUFSIZ);
+	int bytes_recvd = recv(sockd, recv_buf, BUFSIZ, 0);
 
 	extract_segment(&recv_segment, recv_buf);
 	int n = strlen(recv_segment.data) + 1;
 	n = (n<size) * n + (n>size) * size;
 	memcpy(buf, recv_segment.data, n);
 	
-	//printf("Received (%d bytes): %s\n\n%s", n, recv_segment.data, buf);
+	printf("Received %d bytes...\n", bytes_recvd);
 
 	if(recv_segment.fin && !recv_segment.ack){
 		close_server_tcp(sockd);

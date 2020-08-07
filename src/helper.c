@@ -30,8 +30,9 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 	int first_byte = 0;
 	struct stat	obj;
-	char buffer[8192]; //we use this buffer for now, we'll try to use only response buffer
+	char buffer[BUFSIZ]; //we use this buffer for now, we'll try to use only response buffer
 
+	memset(buffer, 0, BUFSIZ);
 	char path[100] = "DirectoryFiles/";
 	strcat(path, file_name);
 	int file_desc = open(path, O_RDONLY);
@@ -47,11 +48,13 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int i = 0; // for tcp struct indexing
 	int k;
 	tcp send_segm[7]; // keeps the segment that we send, so that we can perform resending and/or acknoledg.
-	tcp recv_segm; // used to unpack the ack and see if everything was good
+	tcp recv_segm = (const tcp) { 0 }; // used to unpack the ack and see if everything was good
 	//int n_acked; // this variable shows us how many segments have been acked within the same ack
 	int n_read = 0;
 	slid_win sender_wind; //sliding window for the sender
 	memset(&sender_wind, 0, sizeof(sender_wind)); // we initialize the struct to all 0s
+	for(int i=0; i<7; i++)
+		memset(&send_segm[i], 0, sizeof(tcp));
 	sender_wind.max_size = MAX_WIN; //we accept at most BUFSIZ bytes on the fly at the same time
 	
 	struct timeval time_out;
@@ -65,19 +68,23 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	while(sender_wind.tot_acked < file_size ) {
 		if(sender_wind.on_the_fly < sender_wind.max_size) {
 			n = read(file_desc, response, MSS);
+			if(n < 0){
+				printf("Read error...\n");
+				return -1;
+			}
 			n_read += n;
-			printf("Letti in totale : %d\n", n_read);
+			printf("Total bytes read : %d\n", n_read);
 
 			if(n > 0) {
 				// we check if we can send data without exceeding the max number of bytes on the fly
 				prepare_segment(send_segm, &sender_wind, response, i, n);
 				make_seg(send_segm[i], buffer); // we put our segment in a buffer that will be sent over the socket
 				printf("Tento invio di %d, con lunghezza dati %ld\n", send_segm[i].sequence_number, strlen(send_segm[i].data));
-				//write(socket_desc, buffer, strlen(buffer));
+				send_tcp(socket_desc, buffer, strlen(buffer), 0);
 
-				send_unreliable(buffer, socket_desc);
-				memset(buffer, 0, sizeof(char)*(strlen(buffer)+1)); //we reset the buffer to send the next segment
-				memset(response, 0, sizeof(char)*(strlen(response)+1)); // we reset the buffer so that we can reuse it
+				//send_unreliable(buffer, socket_desc);
+				memset(buffer, 0, BUFSIZ); //we reset the buffer to send the next segment
+				memset(response, 0, BUFSIZ); // we reset the buffer so that we can reuse it
 				i = (i+1)%6;
 			}
 		}
@@ -142,7 +149,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
 		printf("error to create file");
-		return 1;
+		return -1;
 	}
 
 	int n;
@@ -175,7 +182,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 			}
 		}
 		else {
-			tcp *segment = malloc(sizeof(tcp));
+			tcp *segment = (malloc(sizeof(tcp)));
 			extract_segment(segment, retrieveBuffer);
 			memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
 			if(strcmp(segment->data, "END") == 0) {

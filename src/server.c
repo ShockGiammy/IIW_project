@@ -92,19 +92,17 @@ void *evadi_richiesta(void *socket_desc) {
 			printf("command GET entered\n");
 			fflush(stdout);
 			
-			// sets the segment
-			fill_struct(&temp, 0,strlen(client_request) + 1, 0, true, false, false, NULL);
-			make_seg(temp,server_response);
-			send_tcp(socket, server_response, strlen(server_response), 0); // sends the ack
-			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1)); // reset the buffer
+			// tell client that the server is ready
+			send_tcp(socket, "ready", 6, 0);
 			
-			recv_tcp(socket, filesName, 50);
+			int n = recv_tcp(socket, filesName, 50);
+			if( n < 0 ){
+				printf("Invalid filename, abort...\n");
+				int ret = -1;
+				pthread_exit(&ret);
+			}
 			printf("file name is %s \n", filesName);
-
-			temp.ack_number += strlen(filesName);
-			make_seg(temp, server_response);
-			send_tcp(socket, server_response, strlen(server_response), 0);
-			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1));
+			memset(server_response, 0, BUFSIZ);
 
 			if (SendFile(socket, filesName, server_response) == 0) {
 				printf("file transfer completed \n");
@@ -114,24 +112,23 @@ void *evadi_richiesta(void *socket_desc) {
 				char error[] = "ERROR";
 				send(socket, error, sizeof(error), 0);
 			}
+			memset(filesName, 0, BUFSIZ);
+			memset(server_response, 0, BUFSIZ);
 		}
 
 		else if (strcmp(client_request, "put\n") == 0) {
+			char* resp;
 			printf("command PUT entered\n");
 			fflush(stdout);
 
-			fill_struct(&temp, 0, strlen(client_request) + 1, 0, true, false, false, "");
-			make_seg(temp,server_response);
-			send_tcp(socket, server_response, strlen(server_response), 0); // sends the ack
-			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1)); // reset the buffer
+			resp = "ready";
+			send_tcp(socket, "ready", 6, 0);
 
 			recv_tcp(socket, filesName, 50);
 			printf("file name is %s \n", filesName);
 
-			temp.ack_number += strlen(filesName);
-			make_seg(temp, server_response);
-			send_tcp(socket, server_response, strlen(server_response), 0);
-			memset(server_response, 0 , sizeof(char)*(strlen(server_response) + 1));
+			resp = "rcvd fn";
+			send_tcp(socket, resp, strlen(resp)+1, 0);
 
 			RetrieveFile(socket, filesName);
 		}
@@ -149,9 +146,9 @@ void *evadi_richiesta(void *socket_desc) {
 			pthread_exit(&retval);
 		}
 		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
-		memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+		memset(client_request, 0, BUFSIZ);
 		memset(&temp, 0, sizeof(temp));
-		memset(server_response, 0, sizeof(char)*(strlen(server_response) + 1));
+		memset(server_response, 0, BUFSIZ);
 	} while(1);
 }
 

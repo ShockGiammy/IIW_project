@@ -139,8 +139,6 @@ int main(int argc, char *argv[]) {
 	printf("Welcome to the server, %s\n", username);
 	show_menu();
 
-	tcp client_segm;
-	int acked = 0;
 	do{
 		/*if(recv(conn_s, exitBuffer, 10,0) <= 0) {
 			printf("Disconnecting... \n");
@@ -173,66 +171,65 @@ int main(int argc, char *argv[]) {
 		}
 
 		else if(strcmp(command,"get\n") == 0) {
-			acked = 4;
+			char response[BUFSIZ];
 			send_tcp(conn_s, command, strlen(command), 0);
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			recv_tcp(conn_s, command, 100);
-			extract_segment(&client_segm, command);
-			if(!(client_segm.ack_number == acked+1)) {
-				printf("Command lost due to ack %d\n", client_segm.ack_number);
+			int n = recv_tcp(conn_s, response, BUFSIZ);
+			if( n < 0 || ( strcmp(response, "ready") != 0 )){
+				fprintf(stderr, "Server side error, received %s\n", response);
 				exit(EXIT_FAILURE);
 			}
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			printf("Enter the name of the file you want to receive: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			send_tcp(conn_s, fname, strlen(fname), 0);
-			acked = acked + strlen(fname);
-
-			recv_tcp(conn_s, command, 100);
-			extract_segment(&client_segm,command);
-			if(!(client_segm.ack_number == acked + 1)) {
-				printf("File name lost\n");
+			
+			n = send_tcp(conn_s, fname, strlen(fname), 0);
+			if( n < 0 ){
+				perror("Send error...\n");
 				exit(EXIT_FAILURE);
 			}
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			RetrieveFile(conn_s, fname);
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			acked = 0;
+			memset(response, 0, BUFSIZ);
 		}
 
 		else if(strcmp(command,"put\n") == 0){
-			acked = 4;
 			char bufferFile[BUFSIZ];
 
-			send_tcp(conn_s, command, strlen(command), 0);
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
-
-			recv_tcp(conn_s, command, 100);
-			extract_segment(&client_segm, command);
-			if(!(client_segm.ack_number == acked+1)) {
-				printf("Command lost due to ack : %d\n", client_segm.ack_number);
+			int n = send_tcp(conn_s, command, strlen(command), 0);
+			if( n < 0 ){
+				perror("Could not send command...\n");
 				exit(EXIT_FAILURE);
 			}
+
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
+
+			n = recv_tcp(conn_s, server_response, BUFSIZ);
+			if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
+				fprintf(stderr, "Server side error, received: %s\n", server_response);
+				exit(EXIT_FAILURE);
+			}
+
+			memset(server_response, 0, BUFSIZ);
 			
 			printf("Enter the name of the file you want to update: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			send_tcp(conn_s, fname, strlen(fname), 0);
-
-			acked = acked + strlen(fname);
-
-			recv_tcp(conn_s, command, 100);
-			extract_segment(&client_segm,command);
-			if(!(client_segm.ack_number == acked + 1)) {
-				printf("File name lost\n");
+			
+			n = send_tcp(conn_s, fname, strlen(fname), 0);
+			if( n < 0 ){
+				perror("Could not send filename...\n");
 				exit(EXIT_FAILURE);
 			}
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+
+			n = recv_tcp(conn_s, server_response, BUFSIZ);
+			if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
+				fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
+				exit(EXIT_FAILURE);
+			}
 
 			if (SendFile(conn_s, fname, bufferFile) == 0) {
 				printf("file transfer completed \n");
@@ -243,7 +240,7 @@ int main(int argc, char *argv[]) {
 				send_tcp(conn_s, error, strlen(error), 0);
 			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			acked = 0;
+			memset(server_response, 0, BUFSIZ);
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
@@ -255,7 +252,6 @@ int main(int argc, char *argv[]) {
 			printf("Command not valid\n");
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 		}
-		memset(&client_segm, 0, sizeof(client_segm));
 	}while(1);
 }
 

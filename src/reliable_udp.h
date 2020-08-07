@@ -33,7 +33,7 @@ typedef struct tcp_segment
   //int header_length;
   unsigned int receiver_window;
   //int checksum;
-  char data[MSS];
+  char data[MSS+1];
   //char cwr;
   bool syn;
   bool fin;
