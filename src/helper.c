@@ -156,22 +156,20 @@ int RetrieveFile(int socket_desc, char* fname) {
 	// the head for our segment linked list
 	tcp *buf_segm;
 	buf_segm = malloc(sizeof(tcp));
-	buf_segm = NULL;
 
-	tcp ack;
-	slid_win recv_win; // the sliding window for the receiver
+	tcp ack = (const tcp) { 0 };
+	slid_win recv_win = (const slid_win) { 0 }; // the sliding window for the receiver
 	int list_length = 0;
 	/*
 	recv_win.tot_acked = 0; 
 	recv_win.next_to_ack = 0;
 	recv_win.next_seq_num = 0;
 	*/
-	memset(&recv_win, 0, sizeof(recv_win));
 	recv_win.last_to_ack = 7500;
 	
 	struct timeval recv_timeout;
 
-	while ((n = recv_tcp(socket_desc, retrieveBuffer, MSS+37)) > 0) {
+	while ((n = recv_tcp(socket_desc, retrieveBuffer, BUFSIZ)) > 0) {
 		printf("Totale riscontrati %d\n", recv_win.tot_acked);
 		if (strcmp(retrieveBuffer, "ERROR") == 0) {
 			printf("file transfer error \n");
@@ -205,12 +203,12 @@ int RetrieveFile(int socket_desc, char* fname) {
 				}
 
 				// we are in delayed ack and check if we get a new segment 
-				if(recv_tcp(socket_desc, retrieveBuffer, MSS+37) > 0) {
+				if(recv_tcp(socket_desc, retrieveBuffer, BUFSIZ) > 0) {
 					
 					tcp *second_segm = malloc(sizeof(tcp));
 					//we got the new segment
 					extract_segment(second_segm, retrieveBuffer);
-					memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+					memset(retrieveBuffer, 0, BUFSIZ);
 					
 					//check if this is an EOF message 
 					if(strcmp(second_segm->data, "END") == 0) {
@@ -242,7 +240,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 			}
 		}
 		memset(&ack, 0, sizeof(ack));
-		memset(retrieveBuffer, 0, sizeof(char)*(strlen(retrieveBuffer)+1));
+		memset(retrieveBuffer, 0, BUFSIZ);
 	}
 	close(fd);
 

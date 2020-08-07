@@ -436,6 +436,10 @@ int recv_tcp(int sockd, char* buf, size_t size){
 	memset(recv_buf, 0, BUFSIZ);
 
 	int bytes_recvd = recv(sockd, recv_buf, BUFSIZ, 0);
+	if( bytes_recvd < 0 ){
+		fprintf(stderr, "recv_tcp: %s\n", strerror(errno));
+		return -1;
+	}
 
 	extract_segment(&recv_segment, recv_buf);
 	int n = strlen(recv_segment.data) + 1;
