@@ -94,13 +94,16 @@ void make_seg(tcp segment, char *send_segm) {
 }
 
 void extract_segment(tcp *segment, char *recv_segm) {
-	int i = 0;
-	int j = 0; // usefull for indexing the struct
+	int i = 0; // useful for indexing the struct
+	int j = 0;
+
+	memset(segment, 0, sizeof(segment));
+	memset(&(segment->data), 0, MSS+38);
 
 	//deserialize seg number
-	char seg[15];
-	memset(seg, 0, sizeof(char)*(strlen(seg)+1));
-	while(i < 13) {
+	char seg[14];
+	memset(seg, 0, 15);
+	while(j < 13) {
 		seg[j] = recv_segm[i];
 		i++;
 		j++;
@@ -111,58 +114,60 @@ void extract_segment(tcp *segment, char *recv_segm) {
 		//seg_num = (int)strtol(seg, NULL, 16);
 		sscanf(seg, "%X", &seg_num);
 		segment->sequence_number = ntohl(seg_num);
-		printf("Segment number received : %d\n", segment->sequence_number);
 	}
 	else {
 		segment->sequence_number = 0;
 	}
-	j = 0;
+	
+	//printf("Segment number received : %d\n", segment->sequence_number);
 
 	//deserialize ack number
-	char ack[15];
-	memset(ack, 0, sizeof(char)*(strlen(ack)+1));
-	while(i <= 25) {
+	j = 0;
+	char ack[14];
+	memset(ack, 0, 14);
+	while(i < 26) {
 		ack[j] = recv_segm[i];
 		i++;
 		j++;
 	}
+
 	if(strcmp(ack, "0000000000000") != 0) {
 		int ack_num;
 		sscanf(ack, "%X", &ack_num);
 		segment->ack_number = ntohl(ack_num);
-		printf("Ack number : %d\n", segment->ack_number);
+		//printf("Ack number : %d\n", segment->ack_number);
 	}
 	else {
 		segment->ack_number = 0;
 	}
-	j = 0;
 
+	
 	// deserialize flags
-	if(recv_segm[i] == '1') {
+	
+	if(recv_segm[i] == '1') 
 		segment->ack = true;
-	}
-	else {
+	else
 		segment->ack = false;
-	}
-	i++;
-	if(recv_segm[i] == '1') {
-		segment->syn = true;
-	}
-	else {
-		segment->syn = false;
-	}
-	i++;
-	if(recv_segm[i] ==  '1') {
-		segment->fin = true;
-	}
-	else {
-		segment->fin = false;
-	}
-	i++;
 
+	i++;
+	if(recv_segm[i] == '1') 
+		segment->syn = true;
+	else 
+		segment->syn = false;
+
+	i++;
+	if(recv_segm[i] ==  '1') 
+		segment->fin = true;
+	else 
+		segment->fin = false;
+	
+	
+	i++;
 	int recv;
-	char rv[15];
-	memset(rv, 0, sizeof(char)*(strlen(rv)+1));
+	char rv[9];
+	memset(rv, 0, 9);
+
+	j = 0;
 	while(i < 37) {
 		rv[j] = recv_segm[i];
 		i++;
@@ -175,13 +180,17 @@ void extract_segment(tcp *segment, char *recv_segm) {
 	else {
 		segment->receiver_window = 0;
 	}
+	
 	j = 0;
 	//deserialize data
-	while(recv_segm[i] != '\0') {
+	while(recv_segm[i] != 0) {
+		//printf("%c, n. %d\n", recv_segm[i], j);
 		segment->data[j] = recv_segm[i];
 		i++;
 		j++;		
 	}
+
+	printf("Extracted %d bytes of data from %d bytes segment\n", strlen(segment->data), i);
 }
 
 
@@ -193,7 +202,7 @@ void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, 
 	segment->fin = is_fin;
 	segment->syn = is_syn;
 	if(data != NULL) {
-		strncpy(segment->data,data, MSS);
+		strncpy(segment->data,data, MSS+38);
 	}
 }
 
@@ -234,82 +243,97 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 }
 
 void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
-	tcp *index;
-	index = *segment_head;
-	while(index != NULL) {
-		if(index->sequence_number == to_buf->sequence_number) {
+	tcp *current = *segment_head;
+
+	// check if to_buf is already in the list
+	while(current != NULL){
+		if(current->sequence_number == to_buf->sequence_number) {
 			return;
 		}
-		index = index->next;
-	}
+		current = current->next;
+	};
 
+	// if the list is empty, to_buf becomes the head
 	if(*segment_head == NULL){
+		printf("Inserisco in testa, (%d bytes of data)\n", strlen(to_buf->data));
 		*segment_head = to_buf;
 		to_buf->next = NULL;
+		return;
 	}
-
 	else {
-		index = *segment_head;
-		tcp *temp;
-		if(index->next == NULL && index->sequence_number > to_buf->sequence_number) {
-			printf("Inserisco veloce in testa\n");
-			temp = index;
-			to_buf->next = temp;
+		// there are segments in the list
+		// look for the correct position of to_buf in the list based on seq_num
+
+		// if seq_num of to_buf is > than that of the head, to_buf becomes the new head
+		if( ( *segment_head )->sequence_number > to_buf->sequence_number){
+			printf("Inserisco in testa\n");
+			to_buf->next = *segment_head;
 			*segment_head = to_buf;
 			return;
 		}
-		while(index->next != NULL) {
-			if(index->sequence_number > to_buf->sequence_number) {
-				if(index == *segment_head) {
-					printf("Inserisco in testa\n");
-					temp = index;
-					to_buf->next = temp;
-					*segment_head = to_buf;
-					return;
-				}
-				else {
-					printf("Inserisco nel mezzo\n");
-					temp = index;
-					to_buf->next = temp;
-					index = to_buf;
-					return;
-				}
+
+		current = *segment_head;
+		int pos_in_list = 0;
+		tcp* next = current->next;
+		
+		// the current segment has always seq_num <= than that of to_buf
+		do {
+			if(next == NULL){
+				pos_in_list++;
+				printf("Inserisco in posizione %d\n", pos_in_list);
+				current->next = to_buf;
+				to_buf->next = NULL;
+				return;
+			}
+			else if(next->sequence_number > to_buf->sequence_number) {
+				// to_buf must be inserted in the list before the next segment
+				pos_in_list++;
+				printf("Inserisco in posizione %d\n", pos_in_list);
+				current->next = to_buf;
+				to_buf->next = next;
+				return;
 			}
 			else {
-				index = index->next;
-			}
-		}
-		printf("Inserisco nel fondo\n");
-		index->next = to_buf;
-		to_buf->next = NULL;
+				pos_in_list++;
+				current = current->next;
+				next = next->next;
+			};
+
+		} while(1);
 	}
 }
 
 // we call this function to write eventually out of order segments
 int write_all(int fd, int list_size, tcp **segm_buff, slid_win *win) {
 	int n_wrote = 0;
-	tcp *index;
-	index = *segm_buff;
-	while(index != NULL) {
-		if((index)->sequence_number == win->next_to_ack) {
-			printf("Manipolo %d, lunghezza dati %ld\n", index->sequence_number, strlen(index->data));
-			write(fd, (index)->data, strlen((index)->data));
-			win->last_to_ack += strlen((index)->data);
-			win->last_correctly_acked = (index)->sequence_number;
-			win->tot_acked += strlen((index)->data);
-			win->next_seq_num += strlen((index)->data);
-			win->next_to_ack += strlen((index)->data);
+	tcp *current;
+	current = *segm_buff;
+	while(current != NULL) {
+		if((current)->sequence_number == win->next_to_ack) {
+			printf("Manipolo %d, lunghezza dati %ld\n", current->sequence_number, strlen(current->data));
+			write(fd, (current)->data, strlen((current)->data));
+			printf("last_to_ ack %d -> ", win->last_to_ack);
+			win->last_to_ack += strlen((current)->data);
+			printf("%d\n", win->last_to_ack);
+			win->last_correctly_acked = (current)->sequence_number;
+			
+			int new_bytes_acked = strlen((current)->data);
+			
+			win->tot_acked += new_bytes_acked;
+			printf("write_all: %d bytes acked\n", win->tot_acked);
+
+			win->next_seq_num += strlen((current)->data);
+			win->next_to_ack += strlen((current)->data);
 			n_wrote++;
 		}
-		// the segment is out of order, we can't send it now
+		// the segment is out of order, we can't write it now
 		else {
 			break;
 		}
-		index = index->next;
+		current = current->next;
 	}
 
-	//reorder_list(segm_buff, list_size);
-	free_sent_segm(segm_buff, n_wrote);
+	free_segms_in_buff(segm_buff, n_wrote);
 	return n_wrote;
 }
 
@@ -321,7 +345,9 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int 
 	fill_struct(&segment[index], wind->next_seq_num, 0, 0, false, false, false, NULL);
 	wind->next_seq_num += strlen(segment[index].data); // sequence number for the next segment
 	wind->on_the_fly += n_byte;
+	printf("last_to_ ack %d -> ", wind->last_to_ack);
 	wind->last_to_ack += n_byte;
+	printf("%d\n", wind->last_to_ack);
 }
 
 int set_last_correctly_acked(tcp *recv_segm, tcp *segm) {
@@ -345,11 +371,15 @@ void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments) {
 
 
 // function that writes all the segments in order received and reset the buffered segments list length
-void ack_segments(int fd, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win, char *retrieveBuffer) {
+void ack_segments(int fd, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win) {
+	char buff[BUFSIZ];
+	memset(buff, 0 , BUFSIZ);
+	memset(ack->data, 0, MSS+38);
 	*list_length -= write_all(fd, *list_length,  buf_segm, recv_win);
 	fill_struct(ack, 0, recv_win->tot_acked, 0, true, false, false, NULL);
-	make_seg(*ack, retrieveBuffer);
-	send_unreliable(retrieveBuffer, recv_sock);
+	make_seg(*ack, buff);
+	printf("Attempting to ack %d\n", ack->ack_number);
+	send_tcp(recv_sock, buff, strlen(buff) + 1, 0);
 	
 }
 
@@ -370,17 +400,13 @@ void reorder_list(tcp *segment_list, int size) {
 	}
 }
 
-void free_sent_segm(tcp ** head, int n_free) {
-	tcp *index;
-	index = *head;
-	tcp *temp_free;
+void free_segms_in_buff(tcp ** head, int n_free) {
+	tcp* temp;
 	for(int i = 0; i < n_free; i++) {
-		temp_free = index;
-		index = index->next;
-		memset(temp_free->data, 0, sizeof(char)*(strlen(temp_free->data)+1));
-		free(temp_free);
+		temp = *head;
+		*head = (*head)->next;
+		free(temp);
 	}
-	*head = index;
 }
 
 // this function will act a situation in which it is possible to lost segments or acks
@@ -389,6 +415,7 @@ void send_unreliable(char *segm_to_go, int sockd) {
 
 	// 30% of possibility to lost the segment
 	if(p != 0 && p != 1 && p != 2) {
+		printf("Send success...\n");
 		send_tcp(sockd, segm_to_go, strlen(segm_to_go), 0);
 	}
 }
@@ -446,7 +473,7 @@ int recv_tcp(int sockd, char* buf, size_t size){
 	n = (n<size) * n + (n>size) * size;
 	memcpy(buf, recv_segment.data, n);
 	
-	printf("Received %d bytes...\n", bytes_recvd);
+	printf("Received %d bytes, extracted %d...\n", bytes_recvd, n);
 
 	if(recv_segment.fin && !recv_segment.ack){
 		close_server_tcp(sockd);
