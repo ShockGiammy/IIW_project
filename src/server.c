@@ -109,8 +109,6 @@ void *evadi_richiesta(void *socket_desc) {
 			}
 			else {
 				printf("file transfer error \n");
-				char error[] = "ERROR";
-				send(socket, error, sizeof(error), 0);
 			}
 			memset(filesName, 0, BUFSIZ);
 			memset(server_response, 0, BUFSIZ);
@@ -130,7 +128,9 @@ void *evadi_richiesta(void *socket_desc) {
 			resp = "rcvd fn";
 			send_tcp(socket, resp, strlen(resp)+1, 0);
 
-			RetrieveFile(socket, filesName);
+			if(RetrieveFile(socket, filesName) < 0){
+				fprintf(stderr, "RetrieveFile: error...\n");
+			}
 		}
 		else if(strcmp(client_request, "quit\n") == 0){
 			int retval;

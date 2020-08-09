@@ -191,7 +191,9 @@ int main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 			}
 
-			RetrieveFile(conn_s, fname);
+			if( RetrieveFile(conn_s, fname) < 0 ){
+				fprintf(stderr, "RetrieveFile: error...\n");
+			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 			memset(response, 0, BUFSIZ);
 		}

@@ -15,6 +15,7 @@
 
 #define LISTENQ        (1024)   /*  Backlog for listen()   */
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
+#define HEAD_SIZE       19
 #define MAX_WIN         9000
 #define SOCKET_TYPE     SOCK_STREAM
 #define MAX_BUF_SIZE    6
@@ -30,10 +31,11 @@ typedef struct tcp_segment
 {
   unsigned int sequence_number;
   unsigned int ack_number;
+  unsigned int data_length;
   //int header_length;
   unsigned int receiver_window;
   //int checksum;
-  char data[MSS+38];
+  char data[MSS];
   //char cwr;
   bool syn;
   bool fin;
@@ -71,7 +73,7 @@ enum flags {
 /*  Function declarations  */
 int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len);
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
-int recv_tcp(int sockd, char* buf, size_t size);
+int recv_tcp(int sockd, void* buf, size_t size);
 int send_tcp(int sockd, void* buf, size_t size, int flags);
 int close_client_tcp(int sockd);
 void close_server_tcp(int sockd);
@@ -82,12 +84,13 @@ void concat_segm(char *segm, char *to_concat, int max);
 int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);
 void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win);
-int write_all(int fd, int list_size, tcp **segm_buff, slid_win *win);
-void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte);
+int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win);
+void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte, int flags);
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);
-void ack_segments(int fd, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win);
+void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win);
 void send_unreliable(char *segm_to_go, int sockd);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
+
 
 #endif  /*  PG_SOCK_HELP  */
