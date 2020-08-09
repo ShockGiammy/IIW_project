@@ -26,21 +26,6 @@ long conn_s;                /*  connection socket         */
 int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
 
-/*void ricevi_msg() {
-	char msg[MAX_LINE-1];
-	while(1){
-		if(recv(conn_s,msg,MAX_LINE-1,0) <= 0) {
-			printf("Disconnecting... \n");
-			if(close(conn_s) == -1) {
-				printf("Errore close ! \n");
-				exit(-1);
-			}
-			exit(0);
-		}
-		//printf("%s \n",msg);
-	}
-}*/
-
 void _handler(int sigo) {
 	printf("\nChiuso \n");
 	if(close_client_tcp(conn_s) == -1) {
@@ -118,12 +103,6 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
-	/*pthread_t tid;
-	if(pthread_create(&tid,NULL,(void*)ricevi_msg,NULL) != 0) {  
-		printf("Errore nella crezione del thread \n");
-		exit(-1);
-	}*/
-
 	/* connessione */
 	printf("Inserire nome utente: ");
 	if(fgets(username,39,stdin) == NULL) {
@@ -134,20 +113,12 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	send_tcp(conn_s, username, strlen(username), 0);
+	send_tcp(conn_s, username, strlen(username));
 
 	printf("Welcome to the server, %s\n", username);
 	show_menu();
 
 	do{
-		/*if(recv(conn_s, exitBuffer, 10,0) <= 0) {
-			printf("Disconnecting... \n");
-			if(close(conn_s) == -1) {
-				printf("Errore close ! \n");
-				exit(-1);
-			}
-			exit(0);
-		}*/
 		if(fgets(command,MAX_LINE-1,stdin) == NULL) {
 			printf("Errore fgets\n");
 			if(close(conn_s) == -1) {
@@ -156,7 +127,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		if(strcmp(command, "list\n") == 0) {
-			send_tcp(conn_s, command, strlen(command), 0);
+			send_tcp(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 			printf("Files in the current directory : \n");
 			for(;;){
@@ -172,7 +143,7 @@ int main(int argc, char *argv[]) {
 
 		else if(strcmp(command,"get\n") == 0) {
 			char response[BUFSIZ];
-			send_tcp(conn_s, command, strlen(command), 0);
+			send_tcp(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			int n = recv_tcp(conn_s, response, BUFSIZ);
@@ -185,7 +156,7 @@ int main(int argc, char *argv[]) {
 			scanf("%s",fname);
 			getchar();	// remove newline
 			
-			n = send_tcp(conn_s, fname, strlen(fname), 0);
+			n = send_tcp(conn_s, fname, strlen(fname));
 			if( n < 0 ){
 				perror("Send error...\n");
 				exit(EXIT_FAILURE);
@@ -201,7 +172,7 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command,"put\n") == 0){
 			char bufferFile[BUFSIZ];
 
-			int n = send_tcp(conn_s, command, strlen(command), 0);
+			int n = send_tcp(conn_s, command, strlen(command));
 			if( n < 0 ){
 				perror("Could not send command...\n");
 				exit(EXIT_FAILURE);
@@ -221,7 +192,7 @@ int main(int argc, char *argv[]) {
 			scanf("%s",fname);
 			getchar();	// remove newline
 			
-			n = send_tcp(conn_s, fname, strlen(fname), 0);
+			n = send_tcp(conn_s, fname, strlen(fname));
 			if( n < 0 ){
 				perror("Could not send filename...\n");
 				exit(EXIT_FAILURE);
@@ -239,7 +210,7 @@ int main(int argc, char *argv[]) {
 			else {
 				printf("file transfer error \n");
 				char error[] = "ERROR";
-				send_tcp(conn_s, error, strlen(error), 0);
+				send_tcp(conn_s, error, strlen(error));
 			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 			memset(server_response, 0, BUFSIZ);

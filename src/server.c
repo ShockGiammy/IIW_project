@@ -73,17 +73,17 @@ void *evadi_richiesta(void *socket_desc) {
 		    if (dr == NULL) {
 	    		char result[50] = "Could not open current directory\n";
 		    	printf("%s\n", result);
-	        	send_tcp(socket, result, sizeof(result), 0);
+	        	send_tcp(socket, result, sizeof(result));
 	    	}
 
 			while ((de = readdir(dr)) != NULL){
     	        char string[50];
         	    strcpy(string, de->d_name);
 	        	printf("%s\n", string);
-			    send_tcp(socket, string, sizeof(string) + 1, 0);
+			    send_tcp(socket, string, sizeof(string) + 1);
     		}
 			char stop[] = "STOP";
-			send_tcp(socket, stop, sizeof(stop) +1, 0);
+			send_tcp(socket, stop, sizeof(stop) +1);
 	    	closedir(dr);
 	    	printf("file listing completed \n");
 		}
@@ -93,7 +93,7 @@ void *evadi_richiesta(void *socket_desc) {
 			fflush(stdout);
 			
 			// tell client that the server is ready
-			send_tcp(socket, "ready", 6, 0);
+			send_tcp(socket, "ready", 6);
 			
 			int n = recv_tcp(socket, filesName, 50);
 			if( n < 0 ){
@@ -120,30 +120,17 @@ void *evadi_richiesta(void *socket_desc) {
 			fflush(stdout);
 
 			resp = "ready";
-			send_tcp(socket, "ready", 6, 0);
+			send_tcp(socket, "ready", 6);
 
 			recv_tcp(socket, filesName, 50);
 			printf("file name is %s \n", filesName);
 
 			resp = "rcvd fn";
-			send_tcp(socket, resp, strlen(resp)+1, 0);
+			send_tcp(socket, resp, strlen(resp)+1);
 
 			if(RetrieveFile(socket, filesName) < 0){
 				fprintf(stderr, "RetrieveFile: error...\n");
 			}
-		}
-		else if(strcmp(client_request, "quit\n") == 0){
-			int retval;
-			printf("Closing connection with client %s", client);
-			if(close(socket) < 0){
-				printf("...Failure\n");
-				retval = EXIT_FAILURE;
-				fprintf(stderr, "Error while closing socket\n");
-				pthread_exit(&retval);
-			}
-			printf("...Success\n");
-			retval = EXIT_SUCCESS;
-			pthread_exit(&retval);
 		}
 		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
 		memset(client_request, 0, BUFSIZ);

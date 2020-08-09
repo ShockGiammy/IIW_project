@@ -39,16 +39,16 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
 		printf("Error: file not found\n");
-		send_tcp(socket_desc, "ERR", 3, 0);
+		send_tcp(socket_desc, "ERR", 3);
 		fflush(stdout);
 		return -1;
 	}
 
-	send_tcp(socket_desc, "OK", 2, 0);
+	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
 
 	int filesize = file_stat.st_size;
-	send_tcp(socket_desc, &filesize, sizeof(filesize), 0);
+	send_tcp(socket_desc, &filesize, sizeof(filesize));
 
 	int offset = 0;
 	int remain_data = file_stat.st_size;
@@ -57,7 +57,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	/* Sending file data */
 	int n_read = 0;
 	while( (n_read = read(fd, buffer, BUFSIZ)) > 0){
-		if (send_tcp(socket_desc, buffer, n_read, 0) < 0 ){
+		if (send_tcp(socket_desc, buffer, n_read) < 0 ){
 			perror("File transmission error...\n");
 			return -1;
 		}
