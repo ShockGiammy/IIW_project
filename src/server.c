@@ -160,17 +160,10 @@ int main(int argc, char *argv[]) {
 	
 	/*  Create the listening socket  */
 
-    if ( (list_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
+    if ( (list_s = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
 		fprintf(stderr, "server: errore nella creazione della socket.\n");
 		exit(EXIT_FAILURE);
     }
-
-	int yes = 1;
-	int result = setsockopt(list_s,
-                        IPPROTO_TCP,
-                        TCP_NODELAY,
-                        (char *) &yes, 
-                        sizeof(int));    // 1 - on, 0 - off
 
 
     /*  Set all bytes in socket address structure to
@@ -189,17 +182,11 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
-    if ( listen(list_s, LISTENQ) < 0 ) {
-		fprintf(stderr, "server: errore durante la listen.\n");
-		exit(EXIT_FAILURE);
-    }
-
-    
     /*  Enter an infinite loop to respond to client requests  */
     
 	/* Il semaforo ha due token : visto l'accesso concorrente di molti client,il secondo token 
 	serve per segnalare al thread evadi_richiesta che l'utente è stato aggiunto alla chat corretta */
-	gen_id = semget(IPC_PRIVATE,2,IPC_CREAT | 0666);
+	gen_id = semget(IPC_PRIVATE,2, IPC_CREAT | 0666);
 	if(gen_id == -1) {
 		printf("Errore semget \n");
 		exit(-1);
