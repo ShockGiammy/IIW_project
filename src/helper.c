@@ -83,7 +83,11 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 	recv_tcp(socket_desc, buffer, 3);
 	printf("Received: %s\n", buffer);
-	if(strcmp(buffer, "ERR") == 0){
+	if(strcmp(buffer, "ERR") == 0) {
+		if (remove(fname) == 0) 
+      		printf("Deleted successfully\n"); 
+   		else
+      		printf("Unable to delete the file\n"); 
 		return -1;
 	}
 
@@ -105,7 +109,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 		}
 
 		bytes_recvd = strlen(buffer);
-		printf("Received %d new bytes...\n", bytes_recvd, buffer);
+		printf("Received %d new bytes...\n", bytes_recvd);
 		if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
 			perror("File transmission error...\n");
 			return -1;

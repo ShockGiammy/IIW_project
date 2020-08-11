@@ -7510,3 +7510,13 @@ kde 11/92
 
 *End of The Project Gutenberg Etext of LOC WORKSHOP ON ELECTRONIC ETEXTS
 
+een edited for use on computer networks.  This
+editing required the removal of diacritics, underlining, and fonts such
+as italics and bold.  
+
+kde 11/92
+
+[A few of the italics (when used for emphasis) were replaced by CAPS mh]
+
+*End of The Project Gutenberg Etext of LOC WORKSHOP ON ELECTRONIC ETEXTS
+
