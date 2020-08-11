@@ -17,7 +17,7 @@
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define HEAD_SIZE       19
 #define MAX_WIN         9000
-#define SOCKET_TYPE     SOCK_DGRAM
+#define SOCKET_TYPE     SOCK_STREAM
 #define MAX_BUF_SIZE    6
 
 /* Custom FLAGS for send_tcp */
@@ -71,7 +71,7 @@ enum flags {
 #define PG_SOCK_HELP
 
 /*  Function declarations  */
-int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len);
+int connect_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t addr_len);
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
 int recv_tcp(int sockd, void* buf, size_t size);
 int send_tcp(int sockd, void* buf, size_t size);
