@@ -66,13 +66,6 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
-	int yes = 1;
-	int result = setsockopt(conn_s,
-                        IPPROTO_TCP,
-                        TCP_NODELAY,
-                        (char *) &yes, 
-                        sizeof(int));    // 1 - on, 0 - off
-
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
 	memset(&servaddr, 0, sizeof(servaddr));
@@ -98,7 +91,7 @@ int main(int argc, char *argv[]) {
 	printf("Instauro connessione con %s\n", address_string);
     
 	socklen_t addr_len = INET_ADDRSTRLEN;
-	if ( connect_tcp(conn_s, (struct sockaddr*) &servaddr, addr_len ) < 0 ) {
+	if ( connect_tcp(conn_s, &servaddr, addr_len ) < 0 ) {
 		printf("client: errore durante la connect.\n");
 		exit(EXIT_FAILURE);
     }

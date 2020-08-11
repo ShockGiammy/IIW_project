@@ -160,8 +160,8 @@ int main(int argc, char *argv[]) {
 	
 	/*  Create the listening socket  */
 
-    if ( (list_s = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
-		fprintf(stderr, "server: errore nella creazione della socket.\n");
+    if ( (list_s = socket(PF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
+		fprintf(stderr, "server: errore nella creazione della socket.\n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
     }
 
