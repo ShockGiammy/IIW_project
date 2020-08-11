@@ -634,27 +634,28 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	struct sockaddr_in new_sock_addr;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	new_sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	new_sock_addr.sin_addr 		  = addr->sin_addr;
     new_sock_addr.sin_port        = htons(port_host);
 
 	for(int i=0; i< MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\nEnstablishing connection...\n");
 	
+	char address_string[INET_ADDRSTRLEN];
+	inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
+
+	printf("Binding to %s(%d)\n", address_string, ntohs(new_sock_addr.sin_port));
+	
 	if ( bind(socket_descriptor, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
 		fprintf(stderr, "connect: bind error\n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
     }
 
-	char address_string[INET_ADDRSTRLEN];
-	inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
+	char server_address_string[INET_ADDRSTRLEN];
+	inet_ntop(addr->sin_family, &addr->sin_addr, server_address_string, INET_ADDRSTRLEN);
 
-	printf("Binding to %s(%d)\n", address_string, ntohs(new_sock_addr.sin_port));
+	printf("Connecting to %s(%d)\n", server_address_string, ntohs(addr->sin_port));
 
-	if( connect(socket_descriptor, (struct sockaddr *) addr, addr_len) < 0){
-		fprintf(stderr, "connect: udp connect error\n%s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
 
 	printf("Opened socket, sending Syn...\n");
 
@@ -664,28 +665,25 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	fill_struct(&segment,0, 0, 0, 0, 0, 1, NULL);
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
 	make_seg(segment, snd_buf);
-	
-	if( send(socket_descriptor, snd_buf, HEAD_SIZE, 0) < 0 ){
+
+	socklen_t len = INET_ADDRSTRLEN;
+	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, len) < 0 ){
 		perror("Error while sending syn...\n");
 		return -1;
 	}
 
 	printf("Waiting server response...\n");
-	socklen_t len = sizeof(server_addr);
-	if( recv(socket_descriptor, recv_buf, HEAD_SIZE, 0) < 0 ){
+	if( recvfrom(socket_descriptor, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &server_addr, &len) < 0 ){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
 		return -1;
 	}
 
-
-	extract_segment(&head_rcv, recv_buf);
-
-	if( connect(socket_descriptor, (struct sockaddr*) &server_addr, addr_len) < 0){
-		fprintf(stderr, "connect: udp connect error (2)\n%s\n", strerror(errno));
+	if( connect(socket_descriptor, (struct sockaddr *) &server_addr, addr_len) < 0){
+		fprintf(stderr, "connect: udp connect error\n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-	
-	recv_tcp_segm(socket_descriptor, &head_rcv);
+
+	extract_segment(&head_rcv, recv_buf);
 
 	if((head_rcv.syn & head_rcv.ack) == 0){
 		perror("No SYN-ACK from the other end\n");
@@ -719,7 +717,7 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		printf("-");
 	printf("\n");
 
-	printf("Waiting for syn...\n");
+	//printf("Waiting for syn...\n");
 	socklen_t len = sizeof(client_address);
 	if( recvfrom(sockd, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &client_address, &len) < 0 ){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
@@ -742,10 +740,20 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	new_sock_addr.sin_addr 		  = client_address.sin_addr;
     new_sock_addr.sin_port        = htons(new_port);
 
+	memset(address_string, 0, INET_ADDRSTRLEN);
+	inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
+
+	printf("Binding to %s(%d)\n", address_string, ntohs(new_sock_addr.sin_port));
+
     if ( bind(sock_conn, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
 		fprintf(stderr, "server: errore durante la bind \n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
     }
+
+	char client_address_string[INET_ADDRSTRLEN];
+	inet_ntop(client_address.sin_family, &client_address.sin_addr, client_address_string, INET_ADDRSTRLEN);
+
+	printf("Connecting to %s(%d)\n", client_address_string, ntohs(client_address.sin_port));
 
 	if( connect(sock_conn, (struct sockaddr*) &client_address, len) < 0){
 		perror("connect: failed to create socket with bound client address\n");
