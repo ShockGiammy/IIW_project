@@ -12,9 +12,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <netinet/tcp.h>
-#include "reliable_udp.h"
 #include "helper.h"
+#include <netinet/tcp.h>
 
 #define MAX_LINE  4096
 #define STDIN 0
@@ -25,6 +24,21 @@ long conn_s;                /*  connection socket         */
 
 int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
+
+/*void ricevi_msg() {
+	char msg[MAX_LINE-1];
+	while(1){
+		if(recv(conn_s,msg,MAX_LINE-1,0) <= 0) {
+			printf("Disconnecting... \n");
+			if(close(conn_s) == -1) {
+				printf("Errore close ! \n");
+				exit(-1);
+			}
+			exit(0);
+		}
+		//printf("%s \n",msg);
+	}
+}*/
 
 void _handler(int sigo) {
 	printf("\nChiuso \n");
@@ -61,17 +75,10 @@ int main(int argc, char *argv[]) {
 
     /*  Create the listening socket  */
 
-    if ((conn_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
+    if ((conn_s = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
 		fprintf(stderr, "client: errore durante la creazione della socket.\n");
 		exit(EXIT_FAILURE);
     }
-
-	int yes = 1;
-	int result = setsockopt(conn_s,
-                        IPPROTO_TCP,
-                        TCP_NODELAY,
-                        (char *) &yes, 
-                        sizeof(int));    // 1 - on, 0 - off
 
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
@@ -98,10 +105,16 @@ int main(int argc, char *argv[]) {
 	printf("Instauro connessione con %s\n", address_string);
     
 	socklen_t addr_len = INET_ADDRSTRLEN;
-	if ( connect_tcp(conn_s, (struct sockaddr*) &servaddr, addr_len ) < 0 ) {
+	if ( connect_tcp(conn_s, &servaddr, addr_len ) < 0 ) {
 		printf("client: errore durante la connect.\n");
 		exit(EXIT_FAILURE);
     }
+
+	/*pthread_t tid;
+	if(pthread_create(&tid,NULL,(void*)ricevi_msg,NULL) != 0) {  
+		printf("Errore nella crezione del thread \n");
+		exit(-1);
+	}*/
 
 	/* connessione */
 	printf("Inserire nome utente: ");
@@ -113,12 +126,22 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	send_tcp(conn_s, username, strlen(username));
+	Writeline(conn_s, username, strlen(username));
 
 	printf("Welcome to the server, %s\n", username);
 	show_menu();
 
+	tcp client_segm;
+	int acked = 0;
 	do{
+		/*if(recv(conn_s, exitBuffer, 10,0) <= 0) {
+			printf("Disconnecting... \n");
+			if(close(conn_s) == -1) {
+				printf("Errore close ! \n");
+				exit(-1);
+			}
+			exit(0);
+		}*/
 		if(fgets(command,MAX_LINE-1,stdin) == NULL) {
 			printf("Errore fgets\n");
 			if(close(conn_s) == -1) {
@@ -127,12 +150,12 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		if(strcmp(command, "list\n") == 0) {
-			send_tcp(conn_s, command, strlen(command));
+			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 			printf("Files in the current directory : \n");
 			for(;;){
 				memset(&fname, '\0', 50);
-				int temp = recv_tcp(conn_s, fname, 50);
+				int temp = recv(conn_s, fname, 50, 0);
 				if(strcmp(fname, "STOP") == 0){
 					printf("No more files in the directory.\n");
 					break;
@@ -142,67 +165,66 @@ int main(int argc, char *argv[]) {
 		}
 
 		else if(strcmp(command,"get\n") == 0) {
-			char response[BUFSIZ];
-			send_tcp(conn_s, command, strlen(command));
+			acked = 4;
+			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			int n = recv_tcp(conn_s, response, BUFSIZ);
-			if( n < 0 || ( strcmp(response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received %s\n", response);
+			recv(conn_s, command, 100, 0);
+			extract_segment(&client_segm, command);
+			if(!(client_segm.ack_number == acked+1)) {
+				printf("Command lost due to ack %d\n", client_segm.ack_number);
 				exit(EXIT_FAILURE);
 			}
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			printf("Enter the name of the file you want to receive: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			
-			n = send_tcp(conn_s, fname, strlen(fname));
-			if( n < 0 ){
-				perror("Send error...\n");
+			send(conn_s, fname, strlen(fname), 0);
+			acked = acked + strlen(fname);
+
+			recv(conn_s, command, 100, 0);
+			extract_segment(&client_segm,command);
+			if(!(client_segm.ack_number == acked + 1)) {
+				printf("File name lost\n");
 				exit(EXIT_FAILURE);
 			}
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			if( RetrieveFile(conn_s, fname) < 0 ){
-				fprintf(stderr, "RetrieveFile: error...\n");
-			}
+			RetrieveFile(conn_s, fname);
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			memset(response, 0, BUFSIZ);
+			acked = 0;
 		}
 
 		else if(strcmp(command,"put\n") == 0){
+			acked = 4;
 			char bufferFile[BUFSIZ];
 
-			int n = send_tcp(conn_s, command, strlen(command));
-			if( n < 0 ){
-				perror("Could not send command...\n");
-				exit(EXIT_FAILURE);
-			}
-
+			Writeline(conn_s, command, strlen(command));
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received: %s\n", server_response);
+			recv(conn_s, command, 100, 0);
+			extract_segment(&client_segm, command);
+			if(!(client_segm.ack_number == acked+1)) {
+				printf("Command lost due to ack : %d\n", client_segm.ack_number);
 				exit(EXIT_FAILURE);
 			}
-
-			memset(server_response, 0, BUFSIZ);
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
 			
 			printf("Enter the name of the file you want to update: ");
 			scanf("%s",fname);
 			getchar();	// remove newline
-			
-			n = send_tcp(conn_s, fname, strlen(fname));
-			if( n < 0 ){
-				perror("Could not send filename...\n");
-				exit(EXIT_FAILURE);
-			}
+			send(conn_s, fname, strlen(fname), 0);
 
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-				fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
+			acked = acked + strlen(fname);
+
+			recv(conn_s, command, 100, 0);
+			extract_segment(&client_segm,command);
+			if(!(client_segm.ack_number == acked + 1)) {
+				printf("File name lost\n");
 				exit(EXIT_FAILURE);
 			}
+			memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 			if (SendFile(conn_s, fname, bufferFile) == 0) {
 				printf("file transfer completed \n");
@@ -210,10 +232,10 @@ int main(int argc, char *argv[]) {
 			else {
 				printf("file transfer error \n");
 				char error[] = "ERROR";
-				send_tcp(conn_s, error, strlen(error));
+				send(conn_s, error, strlen(error), 0);
 			}
 			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			memset(server_response, 0, BUFSIZ);
+			acked = 0;
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
@@ -225,6 +247,7 @@ int main(int argc, char *argv[]) {
 			printf("Command not valid\n");
 			memset(command, 0, sizeof(char)*(strlen(command)+1));
 		}
+		memset(&client_segm, 0, sizeof(client_segm));
 	}while(1);
 }
 
