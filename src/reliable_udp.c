@@ -739,10 +739,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	int new_port = port++;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	new_sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	new_sock_addr.sin_addr 		  = client_address.sin_addr;
     new_sock_addr.sin_port        = htons(new_port);
-
-	client_address.sin_port = htons(port_host);
 
     if ( bind(sock_conn, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
 		fprintf(stderr, "server: errore durante la bind \n%s\n", strerror(errno));
