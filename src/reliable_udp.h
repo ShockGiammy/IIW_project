@@ -16,7 +16,6 @@
 #define LISTENQ        (1024)   /*  Backlog for listen()   */
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define HEAD_SIZE       19
-#define MAX_WIN         9000
 #define SOCKET_TYPE     SOCK_DGRAM
 #define MAX_BUF_SIZE    6
 
@@ -43,7 +42,7 @@ typedef struct tcp_segment
 
   //this field is usefull to keep the segments in a linked list
   struct tcp_segment *next;
-}tcp;
+} tcp;
 
 /* to have a more precise implementation of TCP we will talk about bytes, and not segments 
 (even if we divide the bytes into chunks, and so into segments)*/
@@ -58,7 +57,14 @@ typedef struct sliding_window {
   int tot_acked; // the total byte that have been acked
   int last_correctly_acked; // the last segment correctly acked, usefull for retx in case of loss / 3 dupl. ack
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
+  //int congWin;
 } slid_win;
+
+typedef struct tcp_timeout_struct {
+  struct timeval time; // struct that keeps the sec and microsec that have to be wait
+  struct timeval est_rtt; // the avg rtt mesured as TCP standard requires
+  struct timeval dev_rtt; // the avg deviance mesured as TCP standard requres
+} time_out;
 
 /* flags for send_tcp */
 enum flags {
@@ -91,6 +97,7 @@ void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, 
 void send_unreliable(char *segm_to_go, int sockd);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
-
+void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
+int actul_window_dimension();
 
 #endif  /*  PG_SOCK_HELP  */

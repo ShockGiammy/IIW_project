@@ -27,6 +27,7 @@
 
 static int port = 10000;
 static int port_host = 13500;
+int congWin = MSS;
 
 int make_seg(tcp segment, char *send_segm) {
 
@@ -407,8 +408,16 @@ int send_tcp(int sockd, void* buf, size_t size){
 	for(int i=0; i<7; i++)
 		memset(&send_segm[i], 0, sizeof(tcp));
 	
-	sender_wind.max_size = MAX_WIN; //we accept at most BUFSIZ bytes on the fly at the same time
-	
+	//sender_wind.max_size = MSS; //we accept at most BUFSIZ bytes on the fly at the same time
+	if (congWin < 160000) {
+		sender_wind.max_size = congWin;
+	}
+	else {
+		sender_wind.max_size =160000;
+	}
+
+	printf("congWin iniziale %d\n", congWin);
+	printf("max size iniziale%d\n", sender_wind.max_size);
 	
 	struct timeval time_out;
 	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
@@ -460,6 +469,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				// printf("Received ack: %d\n", recv_segm.ack_number);
 				// printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
 				// printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+
 				if(recv_segm.ack_number == sender_wind.next_to_ack) {
 					//printf("Ricevuto un riscontro duplicato\n");
 					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
@@ -471,6 +481,18 @@ int send_tcp(int sockd, void* buf, size_t size){
 					}
 				}
 				else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
+					
+					congWin = congWin + MSS;
+					if (congWin < 160000) {
+						sender_wind.max_size = congWin;
+					}
+					else {
+						sender_wind.max_size =160000;
+					}
+
+					printf("congWin %d\n", congWin);
+					printf("max size %d\n", sender_wind.max_size);
+
 					slide_window(&sender_wind, &recv_segm, send_segm);
 					
 					//resets the segments that have been acked
@@ -500,6 +522,15 @@ int send_tcp(int sockd, void* buf, size_t size){
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	//printf("Finished transmission...\n");
 	return n_read;
+}
+
+int actul_window_dimension() {
+	if (congWin < 160000) {
+		return congWin;
+	}
+	else {
+		return 160000;
+	}
 }
 
 int recv_tcp(int sockd, void* buf, size_t size){

@@ -30,6 +30,8 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 	int first_byte = 0;
 	struct stat	file_stat;
+	//int buf_size = BUFSIZ;
+	//char* buffer = malloc(sizeof(char)*buf_size); 
 	char buffer[BUFSIZ]; //we use this buffer for now, we'll try to use only response buffer
 
 	printf("opening file\n");
@@ -54,6 +56,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	int remain_data = file_stat.st_size;
 	int sent_bytes = 0;
 	int n_send = 0;
+
 	/* Sending file data */
 	int n_read = 0;
 	while( (n_read = read(fd, buffer, BUFSIZ)) > 0){
@@ -66,6 +69,9 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 		sent_bytes += n_read;
 		printf("%d / %d sent...\n", sent_bytes, remain_data);
 		memset(buffer, 0, BUFSIZ);
+		/*buf_size = actul_window_dimension();
+		free(buffer);
+		char* buffer = malloc(sizeof(char)*buf_size);*/
 	}
 	
 	return 0;
