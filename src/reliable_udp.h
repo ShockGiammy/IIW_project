@@ -17,7 +17,7 @@
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define HEAD_SIZE       19
 #define SOCKET_TYPE     SOCK_DGRAM
-#define MAX_WIN         MSS * 10
+#define MAX_WIN         MSS * 101200012000
 #define MAX_BUF_SIZE    MAX_WIN / MSS
 #define MAX_LINE  4096
 #define MAX_LINE_DECOR 30
