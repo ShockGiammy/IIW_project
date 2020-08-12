@@ -21,12 +21,9 @@
 #include <netdb.h>
 #include <net/if.h>
 
-#define MAX_LINE  4096
-#define MAX_LINE_DECOR 30
-#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 static int port = 10000;
-static int port_host = 13500;
+const int port_host = 13500;
 int congWin = MSS;
 
 int make_seg(tcp segment, char *send_segm) {
@@ -398,7 +395,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	int bytes_left_to_send = size;
 	int i = 0; // for tcp struct indexing
 	int k;
-	tcp send_segm[7]; // keeps the segment that we send, so that we can perform resending and/or acknowledge.
+	tcp send_segm[MAX_BUF_SIZE]; // keeps the segment that we send, so that we can perform resending and/or acknowledge.
 	tcp recv_segm = (const tcp) { 0 }; // used to unpack the ack and see if everything was good
 	int n_read = 0;
 	slid_win sender_wind; //sliding window for the sender
@@ -409,11 +406,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 		memset(&send_segm[i], 0, sizeof(tcp));
 	
 	//sender_wind.max_size = MSS; //we accept at most BUFSIZ bytes on the fly at the same time
-	if (congWin < 160000) {
+	if (congWin < MAX_WIN) {
 		sender_wind.max_size = congWin;
 	}
 	else {
-		sender_wind.max_size =160000;
+		sender_wind.max_size = MAX_WIN;
 	}
 
 	time_out send_timeo;
@@ -454,14 +451,14 @@ int send_tcp(int sockd, void* buf, size_t size){
 				//send_unreliable(buffer, socket_desc);
 				memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 				memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
-				i = (i+1)%6;
+				i = (i+1)%MAX_BUF_SIZE;
 			}
 		}
 
 		//printf("%d bytes on the fly\n", sender_wind.on_the_fly);
 
 		// we have read the max number of data, we proceed with the sending in pipelining
-		if(sender_wind.on_the_fly == sender_wind.max_size || n_read >= size) {
+		if(sender_wind.on_the_fly >= sender_wind.max_size || n_read >= size) {
 			//printf("Waiting for ack...\n");
 			memset(recv_ack_buf, 0, HEAD_SIZE);
 			if(recv(sockd, recv_ack_buf, HEAD_SIZE, 0) > 0) { //we expect a buffer with only header and no data
@@ -486,11 +483,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 				else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
 					
 					congWin = congWin + MSS;
-					if (congWin < 160000) {
+					if (congWin < MAX_WIN) {
 						sender_wind.max_size = congWin;
 					}
 					else {
-						sender_wind.max_size =160000;
+						sender_wind.max_size = MAX_WIN;
 					}
 
 					printf("congWin %d\n", congWin);
@@ -527,12 +524,12 @@ int send_tcp(int sockd, void* buf, size_t size){
 	return n_read;
 }
 
-int actul_window_dimension() {
-	if (congWin < 160000) {
+int calculate_window_dimension() {
+	if (congWin < MAX_WIN) {
 		return congWin;
 	}
 	else {
-		return 160000;
+		return MAX_WIN;
 	}
 }
 
@@ -561,6 +558,11 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 	while (!finished && (n = recv(sockd, recv_buf, MSS+HEAD_SIZE, 0)) > 0) {
 		//printf("Received %d bytes: %s\n", n, recv_buf);
+
+		if( n<0 ) {
+			fprintf(stderr, "recv error\n%s\n", strerror(errno));
+			return -1;
+		}
 		
 		tcp *segment = malloc(sizeof(tcp));
 		memset(segment, 0, sizeof(tcp));
@@ -608,6 +610,10 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				if( second_segm->data_length < MSS ) {
 					finished = true;
 				}
+			}
+			else {
+				fprintf(stderr, "recv error\n%s\n", strerror(errno));
+				return -1;
 			}
 		}
 		else {

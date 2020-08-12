@@ -225,7 +225,7 @@ books on microfilm to digital image sets, Project Open Book (POB).
 The Workshop offered rather less of an imaging practicum than planned,
 but "how-to" hints emerge at various points, for example, throughout
 KENNEY's presentation and in the discussion of arcana such as
-thresholding aðþ<,thering offered by George THOMA and FLEISCHHAUER.
+thresholding athering offered by George THOMA and FLEISCHHAUER.
 
 NOTES:
      (3)  Although there is a sense in which any reproductions of
@@ -360,7 +360,7 @@ analyzed, but attendees could glean an impression from several of the
 show-and-tell presentations.  The Perseus and American Memory examples
 demonstrated recently published disks, while the descriptions of the
 IBYCUS version of the Papers of George Washington and Chadwyck-Healey's
-Patrologia Latina Database (PLD) ðþ<,of disks to come.  According to
+Patrologia Latina Database (PLD) of disks to come.  According to
 Eric CALALUCA, PLD's principal focus has been on converting Jacques-Paul
 Migne's definitive collection of Latin texts to machine-readable form. 
 Although everyone could share the network advocates' enthusiasm for an
@@ -508,7 +508,7 @@ of greater interconnectedness *
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 After welcoming participants on behalf of the Library of Congress,
-Amðþ<,n Memory (AM), and the National Demonstration Lab, Prosser
+Amn Memory (AM), and the National Demonstration Lab, Prosser
 GIFFORD, director for scholarly programs, Library of Congress, located
 the origin of the Workshop on Electronic Texts in a conversation he had
 had considerably more than a year ago with Carl FLEISCHHAUER concerning
@@ -641,7 +641,7 @@ projects in the text area.
 
 SESSION I.  CONTENT IN A NEW FORM:   WHO WILL USE IT AND WHAT WILL THEY DO?
 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ðþ<,+++++++++
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 DALY * Acknowledgements * A new Latin authors disk *  Effects of the new
 technology on previous methods of research *       
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -772,7 +772,7 @@ through libraries from their homes and offices at their convenience.
 
 The second process of communication involves communication among
 scholars.  Beyond the most common methods of communication, scholars are
-usingðþ<,il and a variety of new electronic communications formats
+usingil and a variety of new electronic communications formats
 derived from it for further academic interchange.  E-mail exchanges are
 growing at an astonishing rate, reportedly 15 percent a month.  They
 currently constitute approximately half the traffic on research and
@@ -894,7 +894,7 @@ database that provides a multimedia curriculum on classical Greek
 civilization, is a good example of the way in which entire curricula are
 being recast using information technologies.  It is anticipated that the
 current difficulty in exchanging electronically computer-based
-instructional software, which in turn makes it difficult fðþ<,e scholar
+instructional software, which in turn makes it difficult fe scholar
 to build upon the work of others, will be resolved before too long. 
 Stand-alone curricular applications that involve electronic text will be
 sharable through networks, reinforcing their significance as intellectual
@@ -1026,7 +1026,7 @@ assisted with the evaluation project of AM, placing AM collections in a
 variety of different sites around the country and helping to organize and
 implement that project.  FREEMAN has been an associate coordinator of AM
 and has been involved principally with the interpretative materials,
-preparing some of theðþ<,tronic exhibits and printed historical
+preparing some of thetronic exhibits and printed historical
 information that accompanies AM and that is requested by users.  VECCIA
 and FREEMAN shared anecdotal observations concerning AM with public users
 of electronic resources.  Notwithstanding a fairly structured evaluation
@@ -1157,7 +1157,7 @@ what the system contains.  Many students sit down at a computer resource
 and assume that, because AM comes from the Library of Congress, all of
 American history is now at their fingertips.  As a result of that sort of
 mistaken judgment, some students are known to conclude that AM contains
-nothing of use to them when they look for ðþ<,r two things and do not
+nothing of use to them when they look for r two things and do not
 find them.  It is difficult to discover that middle ground where one has
 a sense of what the system contains.  Some students grope toward the idea
 of an archive, a new idea to them, since they have not previously
@@ -1290,7 +1290,7 @@ research done by people in private industry or the federal government.
 More important in MICHELSON's view was that, quantitatively, nothing is
 known about the ways in which, for example, humanities scholars are using
 information technology.  No studies exist to offer guidance in creating
-strategies.  The most recentðþ<,y was conducted in 1985 by the American
+strategies.  The most recenty was conducted in 1985 by the American
 Council of Learned Societies (ACLS), and what it showed was that 50
 percent of humanities scholars at that time were using computers.  That
 constitutes the extent of our knowledge.
@@ -1423,7 +1423,7 @@ they are issued.
 
 Drawings are postscript files, not meeting international standards, but
 at least designed to go across platforms.  Images, or rather the real
-archival forms, consist of the bðþ<,vailable slides, which are being
+archival forms, consist of the bvailable slides, which are being
 digitized.  Much of the catalog material exists in database form--a form
 that the average user could use, manipulate, and display on a personal
 computer, but only at great cost.  Thus, this is where the concession
@@ -1554,7 +1554,7 @@ course at Harvard (a general required course that students must take in
 certain areas).  Students were able to use primary material much more.
 
 The Perseus Project has an evaluation team at the University of Maryland
-that has been documenting ðþ<,us' effects on education.  Perseus is very
+that has been documenting us' effects on education.  Perseus is very
 popular, and anecdotal evidence indicates that it is having an effect at
 places other than Harvard, for example, test sites at Ball State
 University, Drury College, and numerous small places where opportunities
@@ -1693,7 +1693,7 @@ CALALUCA also demonstrated how a user can perform a variety of searches
 and quickly move to any part of a volume; the look-up screen provides
 some basic, simple word-searching. 
 
-Cðþ<,CA argued that one of the major difficulties is not the software. 
+CCA argued that one of the major difficulties is not the software. 
 Rather, in creating a product that will be used by scholars representing
 a broad spectrum of computer sophistication,  user documentation proves
 to be the most important service one can provide.
@@ -1826,7 +1826,7 @@ of parentheses and asks for things within so many words of others.
 
 Until they became acquainted recently with some of the work being done in
 classics, the AM staff had not realized that a large number of the
-projects that involve electrðþ<,texts were being done by people with a
+projects that involve electrtexts were being done by people with a
 profound interest in language and linguistics.  Their search strategies
 and thinking are oriented to those fields, as is shown in particular by
 the Perseus example.  As amateur historians, the AM staff were thinking
@@ -1960,7 +1960,7 @@ quality correspondingly impaired.
                                  ******
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-TWOHIG * A contrary experience conðþ<,ng electronic options * Volume of
+TWOHIG * A contrary experience conng electronic options * Volume of
 material in the Washington papers and a suggestion of David Packard *
 Implications of Packard's suggestion * Transcribing the documents for the
 CD-ROM * Accuracy of transcriptions * The CD-ROM edition of the Founding
@@ -2091,7 +2091,7 @@ Trials (OJCCT), presented an illustrated overview of the history of the
 joint project between the American Association for the Advancement of
 Science (AAAS) and the Online Computer Library Center, Inc. (OCLC).  The
 joint venture between AAAS and OCLC owes its beginning to a
-reorganization launched by the new chief executive officer at OCLC abouðþ<,ree years ago and combines the strengths of these two disparate
+reorganization launched by the new chief executive officer at OCLC abouree years ago and combines the strengths of these two disparate
 organizations.  In short, OJCCT represents the process of scholarly
 publishing on line.
 
@@ -2232,7 +2232,7 @@ include scanners, which are much more sophisticated than they were ten years
 ago; mass storage and the dramatic savings that result from it in terms of
 both space and money relative to twenty or thirty years ago; new and
 improved printing technologies, which have greatly affected the distribution
-of information; and, of course, digital technologies, whose applicability toðþ<,ary preservation remains at issue.
+of information; and, of course, digital technologies, whose applicability toary preservation remains at issue.
 
 Given that context, PERSONIUS described the College Library Access and
 Storage System (CLASS) Project, a library preservation project,
@@ -2364,7 +2364,7 @@ PERSONIUS made these additional points:
      * The books subjected to the elaborate process described above were
      selected because CLASS is a preservation project, with the first 500
      books selected coming from Cornell's mathematics collection, because
-     they were still being heavðþ<,sed and because, although they were
+     they were still being heavsed and because, although they were
      in need of preservation, the mathematics library and the mathematics
      faculty were uncomfortable having them microfilmed.  (They wanted a
      printed copy.)  Thus, these books became a logical choice for this
@@ -2496,7 +2496,7 @@ the user interface inextricably bound up with the data, which is the
 typical CD-ROM publication model.  It is not a case of publishing data
 but of distributing a typically stand-alone, typically closed system,
 all--software, user interface, and data--on a little disk.  Hence, all
-the between-disk navigational issues as well as the impossibility in mostðþ<,s of integrating data on one disk with that on another.  Most CD-ROM
+the between-disk navigational issues as well as the impossibility in mosts of integrating data on one disk with that on another.  Most CD-ROM
 retrieval software does not network very gracefully at present.  However,
 in the present world of immature standards and lack of understanding of
 what network information is or what the ground rules are for creating or
@@ -2630,7 +2630,7 @@ a networked environment * Several reasons why CD-ROM software does not
 network *
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-During the discussion period that followed LYNCH's presentation, severðþ<,dditional points were made.
+During the discussion period that followed LYNCH's presentation, severdditional points were made.
 
 LYNCH reiterated even more strongly his contention that, historically,
 once one goes outside high-end science and the group of those who need
@@ -2761,7 +2761,7 @@ Imagequery, especially the advantages and disadvantages of using
 X-Windows.  In the latter category, for example, retrieval is tied
 directly to one's data, an intolerable situation in the long run on a
 networked system.  Finally, BESSER described a project of Jim Wallace at
-the Smithsonian Institution, who is ðþ<,ing images in a extremely
+the Smithsonian Institution, who is ing images in a extremely
 rudimentary way on the Compuserv and Genie networks and is preparing to
 mount them on America On Line.  Although the average user takes over
 thirty minutes to download these images (assuming a fairly fast modem),
@@ -2897,7 +2897,7 @@ thus, to evolve toward an on-line electronic virtual library.
 
 LARSEN concluded by offering a snapshot of current trends:  continuing
 geometric growth in network capacity and number of users; slower
-development of applications; and glacial developðþ<,and adoption of
+development of applications; and glacial developand adoption of
 standards.  The challenge is to design and develop each new application
 system with network access and scalability in mind.
 
@@ -3029,7 +3029,7 @@ William HOOTON, vice president of operations, I-NET, moderated this session.
 KENNEY * Factors influencing development of CXP * Advantages of using
 digital technology versus photocopy and microfilm * A primary goal of
 CXP; publishing challenges * Characteristics of copies printed * Quality
-of samples achieved in image capture * Several factors to be ðþ<,dered
+of samples achieved in image capture * Several factors to be dered
 in choosing scanning * Emphasis of CXP on timely and cost-effective
 production of black-and-white printed facsimiles * Results of producing
 microfilm from digital files * Advantages of creating microfilm * Details
@@ -3160,7 +3160,7 @@ Finally, KENNEY presented details re production:
      demand; although the initial costs are high, scanning technology
      offers an affordable means for reformatting brittle material.
 
-     * A technician in production mode can scan 300 pages per ðþ<,when
+     * A technician in production mode can scan 300 pages per when
      performing single-sheet scanning, which is a necessity when working
      with truly brittle paper; this figure is expected to increase
      significantly with subsequent iterations of the software from Xerox;
@@ -3302,7 +3302,7 @@ creating databases on a topic and putting them on CD-ROM.
 
 (ZIDAR remarked a separate arena from the CD-ROM projects, although the
 processing of the material is nearly identical, in which NATDP is also
-scanning mateðþ<,and loading it on a Next microcomputer, which in turn
+scanning mateand loading it on a Next microcomputer, which in turn
 is linked to NAL's integrated library system.  Thus, searches in NAL's
 bibliographic database will enable people to pull up actual page images
 and text for any documents that have been entered.)
@@ -3438,7 +3438,7 @@ prove critical to the success or failure of one's system.  In addition to
 a stand-alone scanning workstation for image capture, then, text capture
 requires one or two editing stations networked to this scanning station
 to perform editing.  Editing the text takes two or three times as long as
-capturing the images.ðþ<,inally, ZIDAR stressed the importance of buying an open system that allows
+capturing the images.inally, ZIDAR stressed the importance of buying an open system that allows
 for more than one vendor, complies with standards, and can be upgraded.
 
                                  ******
@@ -3574,7 +3574,7 @@ The technology is readily available but changing rapidly.  In this
 context of rapid change, several factors affect quality and cost, to
 which POB intends to pay particular attention, for example, the various
 levels of resolution that can be achieved.  POB believes it can bring
-resolution up to 6ðþ<,i, but an interpolation process from 400 to 600 is
+resolution up to 6i, but an interpolation process from 400 to 600 is
 more likely.  The variation quality in microfilm will prove to be a
 highly important factor.  POB may reexamine the standards used to film in
 the first place by looking at this process as a follow-on to microfilming.
@@ -3714,7 +3714,7 @@ manifested, and several techniques to overcome them.
 
 Fixed thresholding was the first technique described, suitable for
 black-and-white text, when the contrast does not vary over the page.  One
-can have many different threshold levels in ðþ<,ing devices.  Thus,
+can have many different threshold levels in ing devices.  Thus,
 THOMA offered an example of extremely poor contrast, which resulted from
 the fact that the stock was a heavy red.  This is the sort of image that
 when microfilmed fails to provide any legibility whatsoever.  Fixed
@@ -3857,7 +3857,7 @@ BARONAS noted that three types of documents are produced in the AIIM
 standards program:  the first two, accredited by the American National
 Standards Institute (ANSI), are standards and standard recommended
 practices.  Recommended practices differ from standards in that they
-contain more tutorial information.  A techðþ<, report is not an ANSI
+contain more tutorial information.  A tech report is not an ANSI
 standard.  Because AIIM's policies and procedures for developing
 standards are approved by ANSI, its standards are labeled ANSI/AIIM,
 followed by the number and title of the standard.
@@ -3991,7 +3991,7 @@ requiring a variety of ever-changing hardware and software for access--a
 fundamental shift for the library profession.
 
 BATTIN offered a primer on how to move forward with reasonable confidence
-in a world without standards.  Her comments fell roughly iðþ<,wo sections:
+in a world without standards.  Her comments fell roughly iwo sections:
 1) standards in the real world and 2) the politics of reproduction.
 
 In regard to real-world standards, BATTIN argued the need to redefine the
@@ -4136,7 +4136,7 @@ facilitates recognition itself.
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 LESK * Roles of participants in CORE * Data flow * The scanning process *
 The image interface * Results of experiments involving the use of
-electronðþ<,sources and traditional paper copies * Testing the issue of
+electronsources and traditional paper copies * Testing the issue of
 serendipity * Conclusions *
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -4275,7 +4275,7 @@ conversion * Long-term outlook uncertain *
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 To Ricky ERWAY, associate coordinator, American Memory, Library of
-Congress, the constant variety of conversion projects takinðþ<,ce
+Congress, the constant variety of conversion projects takince
 simultaneously represented perhaps the most challenging aspect of working
 on AM.  Thus, the challenge was not to find a solution for text
 conversion but a tool kit of solutions to apply to LC's varied
@@ -4407,7 +4407,7 @@ ZIDAR next rehearsed several typical problems encountered during editing.
 Praising the celerity of her student workers, ZIDAR observed that editing
 requires approximately five to ten minutes per page, assuming that there
 are no large tables to audit.  Confusion among the three characters I, 1, 
-and l, constitutes perhaps thðþ<,t common problem encountered.  Zeroes
+and l, constitutes perhaps tht common problem encountered.  Zeroes
 and  O's also are  frequently confused.  Double M's create a particular
 problem, even on clean pages.  They are so wide in most fonts that they
 touch, and the system simply cannot tell where one letter ends and the
@@ -4537,7 +4537,7 @@ The need for an encoding format that will be reusable and multifunctional
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Susan HOCKEY, director, Center for Electronic Texts in the Humanities
-(CETH), Rutgers and Princeton Universities, announced that oðþ<,lk
+(CETH), Rutgers and Princeton Universities, announced that olk
 (WEIBEL's) was moved into this session from the morning and that David
 Packard was unable to attend.  The session would attempt to focus more on
 what one can do with a text in ASCII and the representation of electronic
@@ -4666,7 +4666,7 @@ an example, he illustrated the index structure in the CORE data.  With
 subsequent illustrated examples of markup, WEIBEL acknowledged the common
 complaint that SGML is hard to read in its native form, although markup
 decreases considerably once one gets into the body.  Without the markup,
-however, one would not hðþ<,he structure in the data.  One can pass
+however, one would not hhe structure in the data.  One can pass
 markup through a LaTeX processor and convert it relatively easily to a
 printed version of the document.
 
@@ -4795,7 +4795,7 @@ displays was the model of text as a bit-mapped image, an image of a page,
 and confessed to having been converted to a limited extent by the
 Workshop to the view that electronic images constitute a promising,
 probably superior alternative to microfilming.  But he was not convinced
-that electronic images represðþ<, serious attempt to represent text in
+that electronic images repres serious attempt to represent text in
 electronic form.  Many of their problems stem from the fact that they are
 not direct attempts to represent the text but attempts to represent the
 page, thus making them representations of representations.
@@ -4925,7 +4925,7 @@ DISCUSSION * Implications of different DTDs and tag sets * ODA versus SGML *
 
 During the discussion that followed, several additional points were made. 
 Neither AAP (i.e., Association of American Publishers) nor CALS (i.e.,
-Computer-aided Acquisition and Logistics Support) has a document-typeðþ<,inition for ancient Greek drama, although the TEI will be able to
+Computer-aided Acquisition and Logistics Support) has a document-typeinition for ancient Greek drama, although the TEI will be able to
 handle that.  Given this state of affairs and assuming that the
 technical-journal producers and the commercial vendors decide to use the
 other two types, then an institution like the Library of Congress, which
@@ -5057,7 +5057,7 @@ final release of the TEI Guidelines.)
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 DISCUSSION * Creating texts with markup advocated * Trends in encoding *
-The TEI and the issue ðþ<,terchangeability of standards * A
+The TEI and the issue terchangeability of standards * A
 misconception concerning the TEI * Implications for an institution like
 LC in the event that a multiplicity of DTDs develops * Producing images
 as a first step towards possible conversion to full text through
@@ -5186,7 +5186,7 @@ with a set of images.
 
 SPERBERG-McQUEEN agreed with WATERS that one can create an SGML document
 consisting wholly of images.  At first sight, organizing graphic images
-with an SGML document may not seem to offer great advantages, bðþ<,e
+with an SGML document may not seem to offer great advantages, be
 advantages of the scheme WATERS described would be precisely that
 ability to move into something that is more of a multimedia document:
 a combination of transcribed text and page images.  WEIBEL concurred in
@@ -5320,7 +5320,7 @@ economic rights are the rights to control the reproduction of a work in
 any form.  They belong to the author, or in the case of a work made for
 hire, the employer.  The second right, which is critical to conversion,
 is the right to change a work.  The right to make new versions is perhaps
-one of the most significant rights oðþ<,hors, particularly in an
+one of the most significant rights ohors, particularly in an
 electronic world.  The third right is the right to publish the work and
 the right to disseminate it, something that everyone who deals in an
 electronic medium needs to know.  The basic rule is if a copy is sold,
@@ -5451,7 +5451,7 @@ rights, the author must sign an agreement giving them away.
 
 In an electronic society, it is important to be able to license a writer
 and work out deals.  With regard to use of a work, it usually is much
-easier when a publisher holds the rightðþ<,n an electronic era, a real
+easier when a publisher holds the rightn an electronic era, a real
 problem arises when one is digitizing and making information available. 
 PETERS referred again to electronic licensing clearinghouses.  Copyright
 ought to remain with the author, but as one moves forward globally in the
@@ -5579,7 +5579,7 @@ specific machine-readable products selectively that were intended to be
 machine-readable.  Materials that were in machine-readable form at one time,
 BYRUM said, would be beyond LC's capability at the moment, insofar as
 attempting to acquire, organize, and preserve them are concerned--and
-preservation would be the most important consideration.  In ðþ<,
+preservation would be the most important consideration.  In 
 connection, GIFFORD reiterated the need to work out some sense of
 distributive responsibility for a number of these issues, which
 inevitably will require significant cooperation and discussion.
@@ -5708,7 +5708,7 @@ copies, LEBRON gave her own journal as an example.  How would she deposit
 OJCCT for copyright?, she asked, because the journal will exist in the
 mainframe at OCLC and people will be able to access it.  Here the
 situation is different, ownership versus access, and is something that
-arises with publication in the on-line eðþ<,nment, faster than is
+arises with publication in the on-line enment, faster than is
 sometimes realized.  Lacking clear answers to all of these questions
 herself, LEBRON did not anticipate that LC would be able to take a role
 in helping to define some of them for quite a while.
@@ -5840,7 +5840,7 @@ FLEISCHHAUER agreed with MYLONAS's framing of strategic questions, adding
 that a large institution such as LC probably has to do all of those
 things at different times.  Thus, the trick is to exercise judgment.  The
 Workshop had added to his and AM's considerations in making those
-judgments.  Concerning future meetingðþ<,discussions, MYLONAS suggested
+judgments.  Concerning future meetingdiscussions, MYLONAS suggested
 that screening priorities would be helpful.
 
 WEIBEL opined that the diversity reflected in this group was a sign both
@@ -6058,7 +6058,7 @@ DINING ROOM A, LIBRARY MADISON 620
 
           Discussion of approaches to structuring text for the computer;
           pros and cons of text coding, description of methods in
-          practice, and comparisðþ<, text-coding methods.
+          practice, and comparis text-coding methods.
 
           Moderator:  Susan Hockey, Director, Center for Electronic Texts
              in the Humanities (CETH), Rutgers and Princeton Universities
@@ -6214,7 +6214,7 @@ too expensive to create a system that acts on SGML in real time.
 However, the regularity provided by SGML is essential for verifying the
 content of the texts, and greatly speeds all the processing performed on
 them.  The fact that the texts exist in SGML ensures that they will be
-relatively easy to port to different hardware and software, andðþ<,ill
+relatively easy to port to different hardware and software, andill
 outlast the current delivery platform.  Finally, the SGML markup
 incorporates existing canonical reference systems (chapter, verse, line,
 etc.); indexing and navigation are based on these features.  This ensures
@@ -6360,7 +6360,7 @@ Maria LEBRON
 The Online Journal of Current Clinical Trials, a joint venture of the
 American Association for the Advancement of Science (AAAS) and the Online
 Computer Library Center, Inc. (OCLC), is the first peer-reviewed journal
-to provideðþ<, text, tabular material, and line illustrations on line. 
+to provide text, tabular material, and line illustrations on line. 
 This presentation will discuss the genesis and start-up period of the
 journal.  Topics of discussion will include historical overview,
 day-to-day management of the editorial peer review, and manuscript
@@ -6503,7 +6503,7 @@ topologies that will help us avoid bottlenecks around servers and
 gateways.  Experience with applications such as these raise still broader
 questions. How closely is the multimedia document tied to the software
 for viewing it?  Can it be accessed and viewed from other applications? 
-Experience with the MARC format (and more recently with the Z39.5ðþ<,otocols) shows how useful it can be to store documents in a form in
+Experience with the MARC format (and more recently with the Z39.5otocols) shows how useful it can be to store documents in a form in
 which they can be accessed by a variety of application software.
 
 Finally, from an intellectual-access standpoint, we need to address the
@@ -6645,7 +6645,7 @@ library services with limited capacities and operating investments.
 SESSION IV-A
 
 Anne KENNEY
-ðþ<, Cornell/Xerox Joint Study in Digital Preservation resulted in the
+ Cornell/Xerox Joint Study in Digital Preservation resulted in the
 recording of 1,000 brittle books as 600-dpi digital images and the
 production, on demand, of high-quality and archivally sound paper
 replacements.  The project, which was supported by the Commission on
@@ -6781,7 +6781,7 @@ digitizing work flow that includes document indexing and storage?
 
 The actual and expected uses of digital images--storage, browsing,
 printing, and OCR--help determine the standards for measuring their
-quality.  Browsing is especially important, bðþ<,e facilities available
+quality.  Browsing is especially important, be facilities available
 for readers to browse image documents is perhaps the weakest aspect of
 imaging technology and most in need of development.  As it defined its
 requirements, the Yale Library concentrated on some fundamental aspects
@@ -6941,7 +6941,7 @@ will support a variety of retrieval, navigation, and display options
 necessary to navigate effectively in very large text databases.
 
 An SGML document consists of text that is marked up with descriptive tags
-that specify the function oðþ<,iven element within the document.  As a
+that specify the function oiven element within the document.  As a
 formal language construct, an SGML document can be parsed against a
 document-type definition (DTD) that unambiguously defines what elements
 are allowed and where in the document they can (or must) occur.  This
@@ -7166,7 +7166,7 @@ PRESENTERS:
      Clifford A. Lynch
      Director, Library Automation
      University of California,
-        Office ðþ<,e President
+        Office e President
      300 Lakeside Drive, 8th Floor
      Oakland, CA 94612-3350
      Phone:  (510) 987-0522
@@ -7480,7 +7480,7 @@ OBSERVERS:
      Manuscript Division LM 102
      (202) 707-5097
 
-    ðþ<,s L. Stevens
+    s L. Stevens
      Information Technology Services LM G51
      (202) 707-9688
 
@@ -7501,6 +7501,16 @@ OBSERVERS:
       *************************************************************
 
 Note:  This file has been edited for use on computer networks.  This
+editing required the removal of diacritics, underlining, and fonts such
+as italics and bold.  
+
+kde 11/92
+
+[A few of the italics (when used for emphasis) were replaced by CAPS mh]
+
+*End of The Project Gutenberg Etext of LOC WORKSHOP ON ELECTRONIC ETEXTS
+
+een edited for use on computer networks.  This
 editing required the removal of diacritics, underlining, and fonts such
 as italics and bold.  
 
