@@ -410,11 +410,16 @@ int send_tcp(int sockd, void* buf, size_t size){
 	sender_wind.max_size = MAX_WIN; //we accept at most BUFSIZ bytes on the fly at the same time
 	
 	
-	struct timeval time_out;
-	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
-	time_out.tv_usec = 0;
+	time_out send_timeo;
+	memset(&send_timeo, 0, sizeof(send_timeo));
 
-	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out)) == -1) {
+	/*struct timeval time_out;
+	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
+	time_out.tv_usec = 0;*/
+	struct timeval start_rtt;
+	struct timeval finish_rtt;
+
+	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&send_timeo, sizeof(send_timeo)) == -1) {
 		printf("Sender error setting opt\n");
 	}
 
@@ -445,6 +450,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				i = (i+1)%6;
 			}
 		}
+		gettimeofday(&start_rtt, NULL);
 
 		//printf("%d bytes on the fly\n", sender_wind.on_the_fly);
 
@@ -453,6 +459,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 			//printf("Waiting for ack...\n");
 			memset(recv_ack_buf, 0, HEAD_SIZE);
 			if(recv(sockd, recv_ack_buf, HEAD_SIZE, 0) > 0) { //we expect a buffer with only header and no data
+				gettimeofday(&finish_rtt, NULL);
+				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+				printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 				memset(&recv_segm, 0, sizeof(recv_segm));
 				extract_segment(&recv_segm, recv_ack_buf);
 				memset(recv_ack_buf, 0, HEAD_SIZE);
@@ -492,11 +501,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 		}
 	}
 	// resets the time-out
-	time_out.tv_sec = 0; // we set 6 sec of timeout, we will estimate it in another moment
+	/*time_out.tv_sec = 0; // we set 6 sec of timeout, we will estimate it in another moment
 	time_out.tv_usec = 0;
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out)) == -1) {
 		printf("Sender error setting opt\n");
-	}
+	}*/
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	//printf("Finished transmission...\n");
 	return n_read;
@@ -618,6 +627,33 @@ int recv_tcp_segm(int sockd, tcp* dest_segm){
 	}
 
 	return n;
+}
+
+// function for timeout estimation
+
+void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time) {
+	struct timeval result; // temp struct to save the result;
+
+	result.tv_sec = last_time.tv_sec - first_time.tv_sec;
+	result.tv_usec = last_time.tv_usec - first_time.tv_usec;
+	
+	// it may be that the microsec is a negative value, so we scale it until it is positive
+	while(result.tv_usec < 0) {
+		result.tv_usec += 1000000; // we add 1 sec
+		result.tv_sec --; // we subtract the sec we added to the microsec
+	}
+
+	// calculate the value of the Estimated_RTT
+	timeo->est_rtt.tv_sec = 0.125*result.tv_sec + (1-0.125)*timeo->est_rtt.tv_sec;
+	timeo->est_rtt.tv_usec = 0.125*result.tv_usec + (1-0.125)*timeo->est_rtt.tv_usec;
+
+	// calculate the value of the Dev_RTT
+	timeo->dev_rtt.tv_sec = (1-0.25)*timeo->dev_rtt.tv_sec + 0.25*abs(timeo->est_rtt.tv_sec - result.tv_sec);
+	timeo->dev_rtt.tv_usec = (1-0.25)*timeo->dev_rtt.tv_usec + 0.25*abs(timeo->est_rtt.tv_usec - result.tv_usec);
+
+	// set the new value for the timeout
+	timeo->time.tv_sec = timeo->est_rtt.tv_sec + 4*timeo->dev_rtt.tv_sec;
+	timeo->time.tv_usec = timeo->est_rtt.tv_usec + 4*timeo->dev_rtt.tv_usec;
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len){
