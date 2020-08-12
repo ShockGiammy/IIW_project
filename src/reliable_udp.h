@@ -16,14 +16,12 @@
 #define LISTENQ        (1024)   /*  Backlog for listen()   */
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define HEAD_SIZE       19
-#define MAX_WIN         9000
 #define SOCKET_TYPE     SOCK_DGRAM
-#define MAX_BUF_SIZE    6
-
-/* Custom FLAGS for send_tcp */
-#define SYN 0
-#define FIN 1
-#define ACK 2
+#define MAX_WIN         MSS * 101200012000
+#define MAX_BUF_SIZE    MAX_WIN / MSS
+#define MAX_LINE  4096
+#define MAX_LINE_DECOR 30
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 
@@ -32,7 +30,6 @@ typedef struct tcp_segment
   unsigned int sequence_number;
   unsigned int ack_number;
   unsigned int data_length;
-  //int header_length;
   unsigned int receiver_window;
   //int checksum;
   char data[MSS];
@@ -43,7 +40,7 @@ typedef struct tcp_segment
 
   //this field is usefull to keep the segments in a linked list
   struct tcp_segment *next;
-}tcp;
+} tcp;
 
 /* to have a more precise implementation of TCP we will talk about bytes, and not segments 
 (even if we divide the bytes into chunks, and so into segments)*/
@@ -58,13 +55,14 @@ typedef struct sliding_window {
   int tot_acked; // the total byte that have been acked
   int last_correctly_acked; // the last segment correctly acked, usefull for retx in case of loss / 3 dupl. ack
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
+  //int congWin;
 } slid_win;
 
 typedef struct tcp_timeout_struct {
   struct timeval time; // struct that keeps the sec and microsec that have to be wait
   struct timeval est_rtt; // the avg rtt mesured as TCP standard requires
   struct timeval dev_rtt; // the avg deviance mesured as TCP standard requres
-}time_out;
+} time_out;
 
 /* flags for send_tcp */
 enum flags {
@@ -98,5 +96,6 @@ void send_unreliable(char *segm_to_go, int sockd);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
 void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
+int calculate_window_dimension();
 
 #endif  /*  PG_SOCK_HELP  */

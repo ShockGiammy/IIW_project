@@ -27,8 +27,6 @@
 #include "helper.h"           /*  our own helper functions  */
 #include "manage_client.h"
 
-#define MAX_LINE	1000
-
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
 
