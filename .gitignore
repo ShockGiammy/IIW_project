@@ -1,8 +1,5 @@
 
-src/.fuse_hidden000005320000003a
-src/client.o
-src/helper.o
-src/server.o
-src/reliable_udp.o
-src/server
 src/client
+*.txt
+*.o
+src/server

@@ -416,9 +416,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 		sender_wind.max_size =160000;
 	}
 
-	printf("congWin iniziale %d\n", congWin);
-	printf("max size iniziale%d\n", sender_wind.max_size);
-	
 	time_out send_timeo;
 	memset(&send_timeo, 0, sizeof(send_timeo));
 
