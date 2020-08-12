@@ -60,6 +60,12 @@ typedef struct sliding_window {
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
 } slid_win;
 
+typedef struct tcp_timeout_struct {
+  struct timeval time; // struct that keeps the sec and microsec that have to be wait
+  struct timeval est_rtt; // the avg rtt mesured as TCP standard requires
+  struct timeval dev_rtt; // the avg deviance mesured as TCP standard requres
+}time_out;
+
 /* flags for send_tcp */
 enum flags {
   Ack = 1 << 0,
@@ -91,6 +97,6 @@ void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, 
 void send_unreliable(char *segm_to_go, int sockd);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
-
+void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
 
 #endif  /*  PG_SOCK_HELP  */
