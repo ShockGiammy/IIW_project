@@ -419,6 +419,12 @@ int send_tcp(int sockd, void* buf, size_t size){
 	printf("congWin iniziale %d\n", congWin);
 	printf("max size iniziale%d\n", sender_wind.max_size);
 	
+	time_out send_timeo;
+	memset(&send_timeo, 0, sizeof(send_timeo));
+
+	printf("congWin iniziale %d\n", congWin);
+	printf("max size iniziale%d\n", sender_wind.max_size);
+	
 	struct timeval time_out;
 	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
 	time_out.tv_usec = 0;
