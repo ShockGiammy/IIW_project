@@ -803,6 +803,13 @@ int close_client_tcp(int sockd){
 	printf("Sending Fin...\n");
 	send_flags(sockd, Fin);
 
+	struct timeval recv_timeout;
+	recv_timeout.tv_sec = 3;
+	recv_timeout.tv_usec = 0;
+	if (setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) < 0) {
+		perror("setsockopt failed\n");
+	}
+
 	recv_tcp_segm(sockd, &temp);
 
 	if((temp.fin & temp.ack) == 0){
@@ -837,6 +844,13 @@ void close_server_tcp(int sockd){
 	printf("\n");
 
 	printf("Received Fin, closing connection...\nSending Fin-Ack...\n");
+
+	struct timeval recv_timeout;
+	recv_timeout.tv_sec = 3;
+	recv_timeout.tv_usec = 0;
+	if (setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) < 0) {
+		perror("setsockopt failed\n");
+	}
 
 	if( send_flags(sockd, Fin | Ack) < 0){
 		perror("Failed to send fin-ack, could not close connection\n");
