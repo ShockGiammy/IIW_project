@@ -416,7 +416,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo;
 	memset(&send_timeo, 0, sizeof(send_timeo));
-	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
+	//send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
 
 	/*struct timeval time_out;
 	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
@@ -448,6 +448,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				int n_buf = make_seg(send_segm[i], send_buf); // we put our segment in a buffer that will be sent over the socket
 				//int n_send = send(sockd, send_buf, n_buf, 0);
 				//printf("Sent %d bytes...\n", n_send);
+
 				send_unreliable(send_buf, sockd, n_buf);
 				memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 				memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
@@ -572,14 +573,14 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 			cong->state = 2;
 			printf("Entered in Fast Recovery\n");
 			cong->threshold = cong->cong_win/2;
-			cong->cong_win = cong->threshold + 3;
+			cong->cong_win = cong->threshold + 3*MSS;
 			break;
 
 		case 1:
 			cong->state = 2;
 			printf("Entered in Fast Recovery\n");
 			cong->threshold = cong->cong_win/2;
-			cong->cong_win = cong->threshold + 3;
+			cong->cong_win = cong->threshold + 3*MSS;
 			break;
 
 		case 2:
