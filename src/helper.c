@@ -21,6 +21,7 @@
 
 
 #define MAX_LINE  4096
+#define BUFSIZE	  160000
 
 
 /*  Read a line from a socket  */
@@ -32,10 +33,10 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	struct stat	file_stat;
 	//int buf_size = BUFSIZ;
 	//char* buffer = malloc(sizeof(char)*buf_size); 
-	char buffer[BUFSIZ]; //we use this buffer for now, we'll try to use only response buffer
+	char buffer[BUFSIZE]; //we use this buffer for now, we'll try to use only response buffer
 
 	printf("opening file\n");
-	memset(buffer, 0, BUFSIZ);
+	memset(buffer, 0, BUFSIZE);
 	char path[100] = "DirectoryFiles/";
 	strcat(path, file_name);
 	int fd = open(path, O_RDONLY);
@@ -59,17 +60,17 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 	/* Sending file data */
 	int n_read = 0;
-	while( (n_read = read(fd, buffer, BUFSIZ)) > 0){
+	while( (n_read = read(fd, buffer, BUFSIZE)) > 0){
+		n_send = strlen(buffer);
+		printf("Sent %d bytes\n\n", n_send);
 		if (send_tcp(socket_desc, buffer, n_read) < 0 ){
 			perror("File transmission error...\n");
 			return -1;
 		}
-		n_send = strlen(buffer);
-		printf("Sent %d bytes\n", n_send);
 		sent_bytes += n_read;
-		printf("%d / %d sent...\n", sent_bytes, remain_data);
-		memset(buffer, 0, BUFSIZ);
-		/*buf_size = actul_window_dimension();
+		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
+		memset(buffer, 0, BUFSIZE);
+		/*buf_size = calculate_window_dimension();
 		free(buffer);
 		char* buffer = malloc(sizeof(char)*buf_size);*/
 	}
@@ -78,8 +79,8 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 }
 
 int RetrieveFile(int socket_desc, char* fname) {
-	char buffer[BUFSIZ];
-	memset(buffer, 0, BUFSIZ);
+	char buffer[BUFSIZE];
+	memset(buffer, 0, BUFSIZE);
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
@@ -97,7 +98,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 		return -1;
 	}
 
-	memset(buffer, 0, BUFSIZ);
+	memset(buffer, 0, BUFSIZE);
 
 	int filesize;
 	recv_tcp(socket_desc, &filesize, sizeof(filesize));
@@ -109,7 +110,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 	int tot_bytes_wr = 0;
 
 	while(  tot_bytes_wr < filesize ){
-		if (recv_tcp(socket_desc, buffer, BUFSIZ) < 0){
+		if (recv_tcp(socket_desc, buffer, BUFSIZE) < 0){
 			perror("RetrieveFile: recv error\n");
 			return -1;
 		}
@@ -122,7 +123,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 		}
 		tot_bytes_wr += bytes_wrttn;
 		printf("%d bytes written...\n", tot_bytes_wr);
-		memset(buffer, 0, BUFSIZ);
+		memset(buffer, 0, BUFSIZE);
 	}
 
 	close(fd);

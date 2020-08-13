@@ -17,7 +17,7 @@
 #define MSS             1500    // we define the MSS for the TCP segment as a constant value
 #define HEAD_SIZE       19
 #define SOCKET_TYPE     SOCK_DGRAM
-#define MAX_WIN         MSS * 101200012000
+#define MAX_WIN         MSS * 100
 #define MAX_BUF_SIZE    MAX_WIN / MSS
 #define MAX_LINE  4096
 #define MAX_LINE_DECOR 30
@@ -41,6 +41,15 @@ typedef struct tcp_segment
   //this field is usefull to keep the segments in a linked list
   struct tcp_segment *next;
 } tcp;
+
+typedef struct congestion_struct
+{
+  int cong_win;
+  int threshold;
+  int state;      // 0 = slow_stat
+                  // 1 = congestion_avoidance
+                  // 2 = fast_recovery
+} cong_struct;
 
 /* to have a more precise implementation of TCP we will talk about bytes, and not segments 
 (even if we divide the bytes into chunks, and so into segments)*/
@@ -97,5 +106,9 @@ void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
 void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
 int calculate_window_dimension();
+int congestion_control_receiveAck(slid_win sender_wind);
+int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind);
+int congestion_control_duplicateAck(slid_win sender_wind);
+int congestion_control_timeout(slid_win sender_wind);
 
 #endif  /*  PG_SOCK_HELP  */
