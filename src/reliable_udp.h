@@ -101,7 +101,7 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win);
 void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte, int flags);
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);
 void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win);
-void send_unreliable(char *segm_to_go, int sockd);
+void send_unreliable(char *segm_to_go, int sockd, int n_bytes);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
 void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);

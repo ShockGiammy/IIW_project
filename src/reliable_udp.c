@@ -374,13 +374,14 @@ void free_segms_in_buff(tcp ** head, int n_free) {
 }
 
 // this function will act a situation in which it is possible to lost segments or acks
-void send_unreliable(char *segm_to_go, int sockd) {
+void send_unreliable(char *segm_to_go, int sockd, int n_bytes) {
 	int p = rand() % 10;
 
 	// 30% of possibility to lost the segment
 	if(p != 0 && p != 1 && p != 2) {
 		printf("Send success...\n");
-		send(sockd, segm_to_go, strlen(segm_to_go), 0);
+		printf("Sto inviando %s\n", segm_to_go);
+		send(sockd, segm_to_go, n_bytes, 0);
 	}
 }
 
@@ -415,6 +416,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo;
 	memset(&send_timeo, 0, sizeof(send_timeo));
+	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
 
 	/*struct timeval time_out;
 	time_out.tv_sec = 3; // we set 6 sec of timeout, we will estimate it in another moment
@@ -444,10 +446,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 				//printf("Flags: %d\n", flags);
 				prepare_segment(send_segm, &sender_wind, data_buf, i, n_to_copy, 0);
 				int n_buf = make_seg(send_segm[i], send_buf); // we put our segment in a buffer that will be sent over the socket
-				int n_send = send(sockd, send_buf, n_buf, 0);
+				//int n_send = send(sockd, send_buf, n_buf, 0);
 				//printf("Sent %d bytes...\n", n_send);
-
-				//send_unreliable(buffer, socket_desc);
+				send_unreliable(send_buf, sockd, n_buf);
 				memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 				memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 				i = (i+1)%MAX_BUF_SIZE;
@@ -730,7 +731,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			finished = true;
 		}
 		
-		//printf("Finished? %d\n", finished);
+		// printf("Finished? %d\n", finished);
 
 		ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
 		//printf("Totale riscontrati %d\n", recv_win.tot_acked);
