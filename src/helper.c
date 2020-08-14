@@ -111,7 +111,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 	while(  tot_bytes_wr < filesize ){
 		if (recv_tcp(socket_desc, buffer, BUFSIZE) < 0){
-			perror("RetrieveFile: recv error\n");
+			fprintf(stderr, "RetrieveFile: %s\n", strerror(errno));
 			return -1;
 		}
 

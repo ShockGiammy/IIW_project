@@ -446,10 +446,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 				//printf("Flags: %d\n", flags);
 				prepare_segment(send_segm, &sender_wind, data_buf, i, n_to_copy, 0);
 				int n_buf = make_seg(send_segm[i], send_buf); // we put our segment in a buffer that will be sent over the socket
-				//int n_send = send(sockd, send_buf, n_buf, 0);
+				int n_send = send(sockd, send_buf, n_buf, 0);
 				//printf("Sent %d bytes...\n", n_send);
 
-				send_unreliable(send_buf, sockd, n_buf);
+				//send_unreliable(send_buf, sockd, n_buf);
 				memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 				memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 				i = (i+1)%MAX_BUF_SIZE;
@@ -466,14 +466,14 @@ int send_tcp(int sockd, void* buf, size_t size){
 			if(recv(sockd, recv_ack_buf, HEAD_SIZE, 0) > 0) { //we expect a buffer with only header and no data
 				gettimeofday(&finish_rtt, NULL);
 				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-				printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
+				//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 				memset(&recv_segm, 0, sizeof(recv_segm));
 				extract_segment(&recv_segm, recv_ack_buf);
 				memset(recv_ack_buf, 0, HEAD_SIZE);
 
-				// printf("Received ack: %d\n", recv_segm.ack_number);
-				// printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
-				// printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+				printf("Received ack: %d\n", recv_segm.ack_number);
+				//printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
+				//printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
 
 				if(recv_segm.ack_number == sender_wind.next_to_ack) {
 					//printf("Ricevuto un riscontro duplicato\n");
@@ -562,7 +562,7 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 		sender_wind.max_size = MAX_WIN;
 	}
 
-	printf("congWin %d\n", cong->cong_win);
+	//printf("congWin receiveACK %d\n", cong->cong_win);
 	return 0;
 }
 
@@ -595,7 +595,7 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 		sender_wind.max_size = MAX_WIN;
 	}
 
-	printf("congWin %d\n", cong->cong_win);
+	//printf("congWin duplicateACK %d\n", cong->cong_win);
 	return 0;
 }
 
@@ -641,7 +641,7 @@ int congestion_control_timeout(slid_win sender_wind) {
 		sender_wind.max_size = MAX_WIN;
 	}
 
-	printf("congWin %d\n", cong->cong_win);
+	//printf("congWin TimeOut %d\n", cong->cong_win);
 	return 0;
 }
 
@@ -672,7 +672,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		//printf("Received %d bytes: %s\n", n, recv_buf);
 
 		if( n<0 ) {
-			fprintf(stderr, "recv error\n%s\n", strerror(errno));
+			fprintf(stderr, "recv error n<0\n%s\n", strerror(errno));
 			return -1;
 		}
 		
@@ -724,7 +724,8 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				}
 			}
 			else {
-				fprintf(stderr, "recv error\n%s\n", strerror(errno));
+				fprintf(stderr, "recv error no byte readed \n%s\n", strerror(errno));
+				printf("byte readed %d", n);
 				return -1;
 			}
 		}
