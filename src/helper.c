@@ -21,7 +21,6 @@
 
 
 #define MAX_LINE  4096
-#define BUFSIZE	  160000
 
 
 /*  Read a line from a socket  */

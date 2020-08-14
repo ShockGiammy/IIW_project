@@ -287,7 +287,7 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int 
 	memset(&segment[index], 0, sizeof(segment[index]));
 	memcpy(segment[index].data, data, n_byte);
 	segment[index].data_length = n_byte;
-	fill_struct(&segment[index], wind->next_seq_num, 0, 0, ack, fin, syn, NULL);
+	fill_struct(&segment[index], wind->next_seq_num, 0, MAX_WIN, ack, fin, syn, NULL);
 	//printf("ASF: %d%d%d\n", segment[index].ack, segment[index].syn, segment[index].fin);
 	
 	wind->next_seq_num += segment[index].data_length; // sequence number for the next segment
@@ -327,7 +327,7 @@ int send_flags(int sockd, int flags){
 	fin = CHECK_BIT(flags, 2);
 	
 	memset(&segment, 0, sizeof(segment));
-	fill_struct(&segment,0, 0, 0, ack, fin, syn, NULL);
+	fill_struct(&segment,0, 0, MAX_WIN, ack, fin, syn, NULL);
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
 	make_seg(segment, buf);
 	int ret = write(sockd, buf, HEAD_SIZE);
@@ -341,7 +341,7 @@ bool ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, 
 	memset(buff, 0 , BUFSIZ);
 	memset(ack->data, 0, MSS);
 	*list_length -= write_all(buf, *list_length,  buf_segm, recv_win, &is_finished);
-	fill_struct(ack, 0, recv_win->tot_acked, 0, true, false, false, NULL);
+	fill_struct(ack, 0, recv_win->tot_acked, MAX_WIN, true, false, false, NULL);
 	ack->data_length = 0;
 	//printf("ack: %d,%d %d%d%d %d\n", ack->sequence_number, ack->ack_number, ack->ack, ack->syn, ack->fin, ack->data_length);
 	make_seg(*ack, buff);
@@ -488,17 +488,20 @@ int send_tcp(int sockd, void* buf, size_t size){
 					// printf("Ricevuto un riscontro duplicato\n");
 					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
 					congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 					//fast retransmission
 					if(sender_wind.dupl_ack == 3) {
 						printf("Fast retx\n");
 						congestion_control_duplicateAck(sender_wind);
+						check_size_buffer(sender_wind, recv_segm.receiver_window);
 						retx(send_segm, sender_wind, send_buf, sockd);
 					}
 				}
 				else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
 					
 					congestion_control_receiveAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 					slide_window(&sender_wind, &recv_segm, send_segm);
 					
@@ -515,6 +518,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			else {
 				printf("TO expired\n");
 				congestion_control_timeout(sender_wind);
+				check_size_buffer(sender_wind, recv_segm.receiver_window);
 				retx(send_segm, sender_wind, send_buf, sockd);
 			}
 			memset(recv_segm.data, 0, recv_segm.data_length);
@@ -563,15 +567,6 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 			printf("Entered in Congestion Avoidance\n");
 			break;
 	}
-
-	if (cong->cong_win < MAX_WIN) {
-		sender_wind.max_size = cong->cong_win;
-	}
-	else {
-		sender_wind.max_size = MAX_WIN;
-	}
-
-	//printf("congWin receiveACK %d\n", cong->cong_win);
 	return 0;
 }
 
@@ -596,27 +591,12 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 			// caso già gestito
 			break;
 	}
-
-	if (cong->cong_win < MAX_WIN) {
-		sender_wind.max_size = cong->cong_win;
-	}
-	else {
-		sender_wind.max_size = MAX_WIN;
-	}
-
-	//printf("congWin duplicateACK %d\n", cong->cong_win);
 	return 0;
 }
 
 int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind) {
 	if (cong->state == 2) {
 		cong->cong_win = cong->cong_win + MSS;
-	}
-	if (cong->cong_win < MAX_WIN) {
-		sender_wind.max_size = cong->cong_win;
-	}
-	else {
-		sender_wind.max_size = MAX_WIN;
 	}
 }
 
@@ -642,15 +622,21 @@ int congestion_control_timeout(slid_win sender_wind) {
 			cong->cong_win = MSS;
 			break;
 	}
+	return 0;
+}
 
-	if (cong->cong_win < MAX_WIN) {
+int check_size_buffer(slid_win sender_wind, int receiver_window) {
+	if (cong->cong_win < receiver_window) {
 		sender_wind.max_size = cong->cong_win;
 	}
 	else {
-		sender_wind.max_size = MAX_WIN;
+		sender_wind.max_size = receiver_window;
 	}
 
-	//printf("congWin TimeOut %d\n", cong->cong_win);
+	//printf("congWin %d\n", cong->cong_win);
+	//printf("threshold %d\n", cong->threshold);
+	//printf("receiver_window %d\n", receiver_window);
+	//printf("max_size %d\n", sender_wind.max_size);
 	return 0;
 }
 
@@ -858,7 +844,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	tcp segment;
 
 	memset(&segment, 0, sizeof(segment));
-	fill_struct(&segment,0, 0, 0, 0, 0, 1, NULL);
+	fill_struct(&segment,0, 0, MAX_WIN, 0, 0, 1, NULL);
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
 	make_seg(segment, snd_buf);
 

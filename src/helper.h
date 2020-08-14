@@ -11,6 +11,8 @@
 #include <math.h>
 #include <sys/time.h>
 
+#define BUFSIZE	  160000
+
 /*  Function declarations  */
 
 int SendFile(int socket_desc, char* file_name, char *server_response);
