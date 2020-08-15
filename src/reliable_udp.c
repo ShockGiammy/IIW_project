@@ -127,7 +127,7 @@ int extract_segment(tcp *segment, char *recv_segm) {
 }
 
 
-void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data) {
+void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, unsigned long recv, bool is_ack, bool is_fin, bool is_syn, char *data) {
 	segment->sequence_number = seq_num;
 	segment->ack_number = ack_num;
 	segment->receiver_window = recv;
@@ -166,7 +166,7 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	for(int i = 0; i < MAX_BUF_SIZE-1; i++) {
 		if(win.next_to_ack == segments[i].sequence_number) {
 			make_seg(segments[i], buffer);
-			int n_send = send_unreliable(socket_desc, buffer, MSS+HEAD_SIZE);
+			int n_send = send_unreliable(socket_desc, buffer, segments[i].data_length + HEAD_SIZE);
 			printf("Ritrasmesso segmento con numero di sequenza %d (%d bytes)\n", segments[i].sequence_number, n_send);
 			memset(buffer, 0, segments[i].data_length + HEAD_SIZE); //we reset the buffer to send the next segment
 			break;
@@ -178,6 +178,13 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 	tcp *current = *segment_head;
 
+	// check if to_buf was already received
+	printf("buff_in_order: %d < %d ? \n", to_buf->sequence_number, win->last_correctly_acked);
+	if(to_buf->sequence_number < win->last_correctly_acked){
+		return;
+	}
+
+
 	// check if to_buf is already in the list
 	while(current != NULL){
 		if(current->sequence_number == to_buf->sequence_number) {
@@ -185,6 +192,15 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 		}
 		current = current->next;
 	};
+
+	// update last_byte_buffered and how much free memory is free in recv buffer
+	printf("%d + %d = %d > %d?\n", to_buf->sequence_number, to_buf->data_length, to_buf->data_length + to_buf->sequence_number, win->rcvwnd);
+	if((to_buf->sequence_number) + (to_buf->data_length) > win->last_byte_buffered){
+		win->last_byte_buffered = to_buf->sequence_number + to_buf->data_length;
+	}
+
+	win->rcvwnd -= to_buf->data_length;
+	printf("Updating rcvwnd to %d\n", win->rcvwnd);
 
 	// if the list is empty, to_buf becomes the head
 	if(*segment_head == NULL){
@@ -237,24 +253,22 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 }
 
 // we call this function to write eventually out of order segments
-int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, bool *is_finished) {
+int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win) {
 	int n_wrote = 0;
 	tcp *current = *segm_buff;
 	while(current != NULL) {
-		//printf(" %d == %d ?\n", current->sequence_number, win->next_to_ack);
+		printf(" %d == %d ?\n", current->sequence_number, win->next_to_ack);
 		if((current)->sequence_number == win->next_to_ack) {
-			//printf("write_all: Manipolo %d, lunghezza dati %ld, copio in %p\n", current->sequence_number, current->data_length, *buf);
-			if(current->data_length != MSS)
-				*is_finished = true;
+			printf("write_all: Manipolo %d, lunghezza dati %ld, copio in %p\n", current->sequence_number, current->data_length, *buf);
 
 			int n = current->data_length;
 			memcpy(*buf, current->data, n);
 			//printf("write_all: \nData: %s\nCopied: %s\n", current->data, *buf);
 			
 			*buf += n;
-			//printf("last_to_ ack %d -> ", win->last_to_ack);
+			printf("last_to_ack %d -> ", win->last_to_ack);
 			win->last_to_ack += n;
-			//printf("%d\n", win->last_to_ack);
+			printf("%d\n", win->last_to_ack);
 			win->last_correctly_acked = (current)->sequence_number;
 			
 			win->tot_acked += n;
@@ -262,7 +276,7 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, bool *i
 			win->next_seq_num += n;
 			win->next_to_ack += n;
 			n_wrote++;
-			//printf("write_all: %d bytes acked / next_to_ack: %d\n", win->tot_acked, win->next_to_ack);
+			printf("write_all: %d bytes acked / next_to_ack: %d\n", win->tot_acked, win->next_to_ack);
 		}
 		else {
 			// the segment is out of order, we can't write it now
@@ -287,23 +301,14 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int 
 	memset(&segment[index], 0, sizeof(segment[index]));
 	memcpy(segment[index].data, data, n_byte);
 	segment[index].data_length = n_byte;
-	fill_struct(&segment[index], wind->next_seq_num, 0, MAX_WIN, ack, fin, syn, NULL);
+	fill_struct(&segment[index], wind->next_seq_num, 0, wind->rcvwnd, ack, fin, syn, NULL);
 	//printf("ASF: %d%d%d\n", segment[index].ack, segment[index].syn, segment[index].fin);
 	
 	wind->next_seq_num += segment[index].data_length; // sequence number for the next segment
 	wind->on_the_fly += n_byte;
-	//printf("last_to_ ack %d -> ", wind->last_to_ack);
+	//printf("last_to_ack %d -> ", wind->last_to_ack);
 	wind->last_to_ack += n_byte;
 	//printf("%d\n", wind->last_to_ack);
-}
-
-int set_last_correctly_acked(tcp *recv_segm, tcp *segm) {
-	for(int i = 0; i < MAX_BUF_SIZE-1; i++) {
-		if((segm[i].sequence_number + strlen(segm[i].data)) == recv_segm->ack_number) {
-			//printf("Segmento in pos %d, ultimo acked in pos %d \n", i, (i+5)%6);
-			return segm[i].sequence_number;
-		}
-	}
 }
 
 // function used to move the sliding window properly
@@ -312,7 +317,6 @@ void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments) {
 	wind->on_the_fly -= wind->n_seg*MSS; // we scale the number of byte acked from the max
 	wind->tot_acked = recv_segm->ack_number;
 	wind->next_to_ack = recv_segm->ack_number;
-	wind->last_correctly_acked = set_last_correctly_acked(recv_segm, segments);//recv_segm->ack_number;
 }
 
 int send_flags(int sockd, int flags){
@@ -335,19 +339,17 @@ int send_flags(int sockd, int flags){
 }
 
 // function that writes all the segments in order received and reset the buffered segments list length
-bool ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win) {
+void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win) {
 	char buff[BUFSIZ];
-	bool is_finished = false; // varaible to understand if we received all the data for this session
 	memset(buff, 0 , BUFSIZ);
 	memset(ack->data, 0, MSS);
-	*list_length -= write_all(buf, *list_length,  buf_segm, recv_win, &is_finished);
-	fill_struct(ack, 0, recv_win->tot_acked, MAX_WIN, true, false, false, NULL);
+	*list_length -= write_all(buf, *list_length,  buf_segm, recv_win);
+	fill_struct(ack, 0, recv_win->tot_acked, recv_win->rcvwnd, true, false, false, NULL);
 	ack->data_length = 0;
-	//printf("ack: %d,%d %d%d%d %d\n", ack->sequence_number, ack->ack_number, ack->ack, ack->syn, ack->fin, ack->data_length);
+	printf("ack: %d,%d %d%d%d %d\n", ack->sequence_number, ack->ack_number, ack->ack, ack->syn, ack->fin, ack->data_length);
 	make_seg(*ack, buff);
-	int n = send(recv_sock, buff, HEAD_SIZE, 0);
+	int n = send_unreliable(recv_sock, buff, HEAD_SIZE);
 	//printf("Sent %d bytes for ack...\n", n);
-	return is_finished;
 }
 
 /* this fucntion is usefull to reorder the list in case that some segments are processed 
@@ -398,7 +400,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	memset(data_buf, 0, MSS);
 
-
 	int bytes_left_to_send = size;
 	int i = 0; // for tcp struct indexing
 	int k;
@@ -413,13 +414,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 		memset(&send_segm[j], 0, sizeof(tcp));
 	
 	//sender_wind.max_size = MSS; //we accept at most BUFSIZ bytes on the fly at the same time
-	if (cong->cong_win < MAX_WIN) {
-		sender_wind.max_size = cong->cong_win;
-	}
-	else {
-		sender_wind.max_size = MAX_WIN;
-	}
-
+	printf("congWin: %d\n", cong->cong_win);
+	sender_wind.max_size = cong->cong_win < MAX_WIN-MSS ? cong->cong_win : MAX_WIN-MSS;
+	sender_wind.max_size = sender_wind.max_size < size ? sender_wind.max_size : size;
+	printf("sending %d bytes...\n", size);
+	printf("max: %d\nlast_to_ack: %d\n", sender_wind.max_size, sender_wind.last_to_ack);
 	time_out send_timeo;
 	memset(&send_timeo, 0, sizeof(send_timeo));
 	send_timeo.time.tv_sec = 5; // we set the first timeout to 3sec, as it's in TCP standard
@@ -435,19 +434,20 @@ int send_tcp(int sockd, void* buf, size_t size){
 	}
 
 	while(sender_wind.tot_acked < size) {
-		// printf("%d bytes acked out of %d\n", sender_wind.tot_acked, size);
-		if((sender_wind.on_the_fly < sender_wind.max_size && sender_wind.last_to_ack < size)) {
+		// printf("%d bytes acked out of %d\n", sender_wind.tot_acked, sender_wind.max_size);
+		// printf("%d < %d ?\n", sender_wind.on_the_fly, sender_wind.last_to_ack);
+		if((sender_wind.on_the_fly < sender_wind.max_size && sender_wind.last_to_ack <= size)) {
 			int n_to_copy = (bytes_left_to_send > MSS)*MSS + (bytes_left_to_send <= MSS)*bytes_left_to_send;
-			// printf("Taking %d bytes from input buf\n", n_to_copy);
+			printf("Taking %d bytes from input buf\n", n_to_copy);
 			memcpy(data_buf, buf, n_to_copy);
 			// printf("Copied: %s\n", data_buf);
 			bytes_left_to_send -= n_to_copy;
 			data_buf[n_to_copy] = 0;
 			n_read += n_to_copy;
 			buf += n_to_copy-1 ;
-			// printf("Total bytes read : %d\n", n_read);
+			printf("Total bytes read : %d\n", n_read);
 
-			// printf("Da copiare : %d\n", n_to_copy);
+			printf("Da copiare : %d\n", n_to_copy);
 			if(n_to_copy >= 0) {
 				// we check if we can send data without exceeding the max number of bytes on the fly
 				prepare_segment(send_segm, &sender_wind, data_buf, i, n_to_copy, 0);
@@ -464,9 +464,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 		gettimeofday(&start_rtt, NULL);
 
 		// we have read the max number of data, we proceed with the sending in pipelining
-
+		printf("%d >= %d || %d >= %d\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
 		if(sender_wind.on_the_fly >= sender_wind.max_size || n_read >= size) {
-			// printf("Waiting for ack...\n");
+			printf("Waiting for ack...\n");
 			memset(recv_ack_buf, 0, HEAD_SIZE);
 			if(recv(sockd, recv_ack_buf, HEAD_SIZE, 0) > 0) { //we expect a buffer with only header and no data
 
@@ -480,12 +480,12 @@ int send_tcp(int sockd, void* buf, size_t size){
 				extract_segment(&recv_segm, recv_ack_buf);
 				memset(recv_ack_buf, 0, HEAD_SIZE);
 
-				// printf("Received ack: %d\n", recv_segm.ack_number);
-				// printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
-				// printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+				printf("Received ack: %d\n", recv_segm.ack_number);
+				printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
+				printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
 
 				if(recv_segm.ack_number == sender_wind.next_to_ack) {
-					// printf("Ricevuto un riscontro duplicato\n");
+					printf("Ricevuto un riscontro duplicato\n");
 					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
 					congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
 					check_size_buffer(sender_wind, recv_segm.receiver_window);
@@ -532,8 +532,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 		printf("Sender error setting opt\n");
 	}
 	memset(send_buf, 0, MSS+HEAD_SIZE);
-	printf("Finished transmission...\n");
-	return n_read;
+	printf("Finished transmission (%d bytes)...\n", sender_wind.tot_acked);
+	return sender_wind.tot_acked;
 }
 
 int calculate_window_dimension() {
@@ -657,6 +657,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 	memset(&recv_win, 0, sizeof(recv_win));
 	recv_win.last_to_ack = MAX_WIN-MSS;
+	recv_win.rcvwnd = size;
 	
 	struct timeval recv_timeout;
 	recv_timeout.tv_sec = 0;
@@ -668,10 +669,10 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	int bytes_rcvd = 0;
 
 	while (!finished && (n = recv(sockd, recv_buf, MSS+HEAD_SIZE, 0)) > 0) {
-		// printf("Received %d bytes: %s\n", n, recv_buf);
+		printf("Received %d bytes: %s\n", n, recv_buf);
 
 		if( n<0 ) {
-			// fprintf(stderr, "recv: no bytes read\n%s\n", strerror(errno));
+			fprintf(stderr, "recv: no bytes read\n%s\n", strerror(errno));
 		}
 		
 		tcp *segment = malloc(sizeof(tcp));
@@ -682,25 +683,26 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			close_server_tcp(sockd);
 		}
 		
-		// printf("New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
+		printf("New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
 		
 		// buffer segments
 		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
 			list_length++;
-			// printf("Buffering segment...\n");
+			printf("Buffering segment...\n");
 			buffer_in_order(&buf_segm, segment, &recv_win);
 		}
 		
 		recv_timeout.tv_sec = 0;
 		recv_timeout.tv_usec = 500000;
 		if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-			// printf("Error while setting options");
+			printf("Error while setting options");
 			return -1;
 		}
 
 		// delayed ack -> check if we get a new segment 
-		if(segment->data_length == MSS) {
+		printf("%d <= %d ?\n", segment->data_length, recv_win.rcvwnd);
+		if(segment->data_length <= recv_win.rcvwnd) {
 			if((n = recv(sockd, recv_buf, MSS+HEAD_SIZE, 0) > 0)){
 				tcp *second_segm = malloc(sizeof(tcp));
 				// we got the new segment
@@ -709,40 +711,36 @@ int recv_tcp(int sockd, void* buf, size_t size){
 					close_server_tcp(sockd);
 				}
 
-				// printf("New segment of %d bytes, seq num %d\n", second_segm->data_length, second_segm->sequence_number);
+				printf("New segment of %d bytes, seq num %d\n", second_segm->data_length, second_segm->sequence_number);
 				memset(recv_buf, 0, MSS+HEAD_SIZE);
 
-				// printf("Buffering segment...\n");
+				printf("Buffering segment...\n");
 				buffer_in_order(&buf_segm, second_segm, &recv_win);
 				list_length++;
-				
-				//check if this is the last segment
-				if( second_segm->data_length < MSS) {
-					finished = true;
-				}
 			}
 			else {
-				// fprintf(stderr, "recv: no bytes read\n%s\n", strerror(errno));
-			}
-		}
-		else {
-			if(segment->data_length != MSS) {
+				fprintf(stderr, "recv: no bytes read\n%s\n", strerror(errno));
 				finished = true;
 			}
 		}
+		else {
+			// segment->data_length > recv_win.rcvwnd)
+			// can't receive anymore
+			finished = true;
+		}
 		
-		// printf("Finished? %d\n", finished);
+		printf("Finished? %d\n", finished);
 
-		finished = ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
-		// printf("Totale riscontrati %d\n", recv_win.tot_acked);
+		ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
+		printf("Totale riscontrati %d\n", recv_win.tot_acked);
 		bytes_rcvd = recv_win.tot_acked;
 
-		if(bytes_rcvd == size) {
+		if(bytes_rcvd == recv_win.rcvwnd) {
 			finished = true;
 		}
 		
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
-		//printf("Resetto il timeout\n");
+		printf("Resetto il timeout\n");
 		recv_timeout.tv_sec = 0;
 		recv_timeout.tv_usec = 0;
 		setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout));
@@ -756,7 +754,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout));
 	memset(recv_buf, 0, MSS+HEAD_SIZE);
 
-	// printf("Finished transmission...\n");
+	printf("Finished transmission...\n");
 	return bytes_rcvd;
 }
 

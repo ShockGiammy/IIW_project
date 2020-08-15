@@ -60,12 +60,15 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	/* Sending file data */
 	int n_read = 0;
 	while( (n_read = read(fd, buffer, BUFSIZE)) > 0){
-		n_send = strlen(buffer);
-		printf("Sent %d bytes\n\n", n_send);
-		if (send_tcp(socket_desc, buffer, n_read) < 0 ){
+		if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
 			perror("File transmission error...\n");
 			return -1;
 		}
+		if(n_read != n_send){
+			fprintf(stderr, "Did not send as much data as read!\nread: %d\nsent: %d\n", n_read, n_send);
+			return -1;
+		}
+		printf("Sent %d bytes\n\n", n_send);
 		sent_bytes += n_read;
 		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
 		memset(buffer, 0, BUFSIZE);
@@ -109,19 +112,17 @@ int RetrieveFile(int socket_desc, char* fname) {
 	int tot_bytes_wr = 0;
 
 	while(tot_bytes_wr < filesize ){
-		if (recv_tcp(socket_desc, buffer, BUFSIZE) < 0){
+		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, BUFSIZE)) < 0){
 			fprintf(stderr, "RetrieveFile: %s\n", strerror(errno));
 			return -1;
 		}
-
-		bytes_recvd = strlen(buffer);
 		printf("Received %d new bytes...\n", bytes_recvd);
 		if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
 			perror("File transmission error...\n");
 			return -1;
 		}
 		tot_bytes_wr += bytes_wrttn;
-		printf("%d bytes written...\n", tot_bytes_wr);
+		printf("%d / %d bytes written...\n", tot_bytes_wr, filesize);
 		memset(buffer, 0, BUFSIZE);
 	}
 
