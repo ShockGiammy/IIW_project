@@ -156,7 +156,6 @@ int process_manager(int list_s) {
 
 	printf("process %d is waiting to accept connection\n", getpid());
 	
-	
 	while(1) {
 		pause();
 
