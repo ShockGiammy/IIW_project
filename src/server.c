@@ -248,24 +248,27 @@ int main(int argc, char *argv[]) {
 
 	fd_set rset;
 	int process_to_wake_up = 0;
+	int selector = 0;
     while ( 1 ) {
 
 		FD_ZERO(&rset); /* inizializza a 0 il set dei descrittori in lettura */
 		FD_SET(list_s, &rset); /* inserisce il descrittore del socket */
-		printf("ciao");
 
-		if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* attende descrittore pronto in lettura */
-			perror("errore in select");
-			exit(1);
+		if (selector == 0) {
+			if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* attende descrittore pronto in lettura */
+				perror("errore in select");
+				exit(1);
+			}
+			printf("new connection\n");
+			/* Se è arrivata una richiesta di connessione, il socket di ascolto
+			è leggibile: viene invocata accept() e creato un socket di connessione */
+			if (FD_ISSET(list_s, &rset)) {
+				kill(pids[process_to_wake_up], SIGUSR1);
+				printf("signal sended\n");
+			}
+			process_to_wake_up = (process_to_wake_up+1)%10;
+			selector = (selector+1)%3;
 		}
-		printf("new connection");
-		/* Se è arrivata una richiesta di connessione, il socket di ascolto
-		è leggibile: viene invocata accept() e creato un socket di connessione */
-		if (FD_ISSET(list_s, &rset)) {
-			kill(pids[process_to_wake_up], SIGUSR1);
-			printf("signal sended");
-		}
-		process_to_wake_up++;
 	}
 }
 
