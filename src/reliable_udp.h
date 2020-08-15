@@ -46,6 +46,7 @@ typedef struct congestion_struct
 {
   int cong_win;
   int threshold;
+  int support_variable;
   int state;      // 0 = slow_stat
                   // 1 = congestion_avoidance
                   // 2 = fast_recovery
