@@ -13,14 +13,17 @@
 
 
 
-#define LISTENQ        (1024)   /*  Backlog for listen()   */
-#define MSS             1500    // we define the MSS for the TCP segment as a constant value
-#define HEAD_SIZE       19
-#define SOCKET_TYPE     SOCK_DGRAM
-#define MAX_WIN         MSS * 100
-#define MAX_BUF_SIZE    MAX_WIN / MSS
-#define MAX_LINE  4096
-#define MAX_LINE_DECOR 30
+#define LISTENQ          (1024)   /*  Backlog for listen()   */
+#define MSS               1500    // we define the MSS for the TCP segment as a constant value
+#define HEAD_SIZE         19
+#define SOCKET_TYPE       SOCK_DGRAM
+#define MAX_WIN           MSS * 100
+#define MAX_BUF_SIZE      MAX_WIN / MSS
+#define MAX_LINE          4096
+#define MAX_LINE_DECOR    30
+#define MAX_ATTMPTS_RETX  10
+#define RECV_TIMEOUT_SEC  1 << 11
+#define RECV_TIMEOUT_SHORT_USEC 1 << 19
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
@@ -46,7 +49,7 @@ typedef struct congestion_struct
 {
   int cong_win;
   int threshold;
-  int state;      // 0 = slow_stat
+  int state;      // 0 = slow_start
                   // 1 = congestion_avoidance
                   // 2 = fast_recovery
 } cong_struct;
@@ -67,6 +70,7 @@ typedef struct sliding_window {
   //int congWin;
   int rcvwnd;
   int last_byte_buffered;
+  int bytes_acked_current_transmission;
 } slid_win;
 
 typedef struct tcp_timeout_struct {
@@ -94,7 +98,7 @@ int close_client_tcp(int sockd);
 void close_server_tcp(int sockd);
 int make_seg(tcp segment, char *send_segm);
 int extract_segment(tcp *segment, char *recv_segm);
-void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, unsigned long recv, bool is_ack, bool is_fin, bool is_syn, char *data);
+void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, unsigned long recv, bool is_ack, bool is_fin, bool is_syn);
 void concat_segm(char *segm, char *to_concat, int max);
 int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);

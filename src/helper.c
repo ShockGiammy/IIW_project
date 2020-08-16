@@ -64,10 +64,10 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 			perror("File transmission error...\n");
 			return -1;
 		}
-		if(n_read != n_send){
-			fprintf(stderr, "Did not send as much data as read!\nread: %d\nsent: %d\n", n_read, n_send);
-			return -1;
-		}
+		// if(n_read != n_send){
+		// 	fprintf(stderr, "Did not send as much data as read!\nread: %d\nsent: %d\n", n_read, n_send);
+		// 	return -1;
+		// }
 		printf("Sent %d bytes\n\n", n_send);
 		sent_bytes += n_read;
 		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
