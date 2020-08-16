@@ -558,7 +558,11 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 			break;
 
 		case 1:
-			cong->cong_win = cong->cong_win + (int)floor(MSS*MSS/cong->cong_win);
+			cong->support_variable = cong->support_variable + (int)floor(MSS*MSS/cong->cong_win);
+			if (cong->support_variable >= MSS) {
+				cong->cong_win = cong->cong_win + MSS;
+				cong->support_variable = cong->support_variable - MSS;
+			}
 			break;
 
 		case 2:
@@ -838,7 +842,6 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 
 	printf("Connecting to %s(%d)\n", server_address_string, ntohs(addr->sin_port));
 
-
 	printf("Opened socket, sending Syn...\n");
 
 	tcp segment;
@@ -886,8 +889,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	cong->state = 0;
 	cong->cong_win = MSS;
 	cong->threshold = 64000;
+	cong->support_variable = 0;
 	return 0;
-
 }
 
 int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
@@ -947,7 +950,6 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		return -1;
 	}
 	
-
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
 	if(head_rcv.syn){
 		printf("Received Syn, sending Syn-Ack...\n");
@@ -980,6 +982,7 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	cong->state = 0;
 	cong->cong_win = MSS;
 	cong->threshold = 64000;
+	cong->support_variable = 0;
 
 	return sock_conn;
 }

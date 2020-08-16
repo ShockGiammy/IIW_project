@@ -27,6 +27,8 @@
 #include "helper.h"           /*  our own helper functions  */
 #include "manage_client.h"
 
+#define PROCESSES 10
+
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
 
@@ -137,15 +139,47 @@ void *evadi_richiesta(void *socket_desc) {
 	} while(1);
 }
 
+void wake_up(int signum) {
+	if (signum == SIGUSR1)
+    {
+        printf("process %d is awake\n", getpid());
+    }
+}
+
+int process_manager(int list_s) {
+	int sin_size;
+	int conn_s;
+	pthread_t tid;
+	int *conn = malloc(sizeof(int));
+
+	signal(SIGUSR1, wake_up);
+
+	printf("process %d is waiting to accept connection\n", getpid());
+	
+	while(1) {
+		pause();
+
+		/*  Wait for a connection, then accept() it  */
+		sin_size = sizeof(struct sockaddr_in);
+		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
+		    fprintf(stderr, "server: errore nella accept.\n");
+	   		exit(-1);
+		}
+		*conn = conn_s;
+		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
+			printf("Errore server : impossibile creare il thread \n");
+			exit(-1);
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
 	
-	pthread_t tid;
-	char     *endptr;                /*  for strtol()              */
-    int 	  sin_size;   
+	char     *endptr;                /*  for strtol()              */   
     short int port;                  /*  port number               */
 	int       list_s;                /*  listening socket          */
 	/*  Get command line arguments  */
-	int conn_s;
+	pid_t pids[PROCESSES];
 	
 	ParseCmdLine(argc, argv, &endptr);
 	port = strtol(endptr, &endptr, 0);
@@ -163,6 +197,19 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
+	for (int i = 0; i < PROCESSES; i++) {
+		int pid;
+		pid = fork();
+		if (pid == -1) {
+			printf("Cannot fork!\n");
+		}
+		else if (pid == 0) {
+			process_manager(list_s);
+		}
+		else {
+			pids[i] = pid;
+		}
+	}
 
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
@@ -197,20 +244,29 @@ int main(int argc, char *argv[]) {
 		printf("Errore sul secondo token in semctl \n");
 		exit(-1);
 	}
-	//signal(SIGINT,close_handler);
+
+	fd_set rset;
+	int process_to_wake_up = 0;
+	int selector = 0;
     while ( 1 ) {
-		
-		int *conn = malloc(sizeof(int));
-		/*  Wait for a connection, then accept() it  */
-		sin_size = sizeof(struct sockaddr_in);
-		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
-		    fprintf(stderr, "server: errore nella accept.\n");
-	    	break;
-		}
-		*conn = conn_s;
-		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
-			printf("Errore server : impossibile creare il thread \n");
-			exit(-1);
+
+		FD_ZERO(&rset); /* inizializza a 0 il set dei descrittori in lettura */
+		FD_SET(list_s, &rset); /* inserisce il descrittore del socket */
+
+		if (selector == 0) {
+			if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* attende descrittore pronto in lettura */
+				perror("errore in select");
+				exit(1);
+			}
+			printf("new connection\n");
+			/* Se è arrivata una richiesta di connessione, il socket di ascolto
+			è leggibile: viene invocata accept() e creato un socket di connessione */
+			if (FD_ISSET(list_s, &rset)) {
+				kill(pids[process_to_wake_up], SIGUSR1);
+				printf("signal sended\n");
+			}
+			process_to_wake_up = (process_to_wake_up+1)%10;
+			selector = (selector+1)%3;
 		}
 	}
 }
