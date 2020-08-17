@@ -253,6 +253,8 @@ int main(int argc, char *argv[]) {
 		FD_ZERO(&rset); /* inizializza a 0 il set dei descrittori in lettura */
 		FD_SET(list_s, &rset); /* inserisce il descrittore del socket */
 
+		printf("non togliete questo print\n");
+
 		if (selector == 0) {
 
 			if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* attende descrittore pronto in lettura */
