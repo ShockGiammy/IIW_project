@@ -804,6 +804,11 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 	// set the new value for the timeout
 	timeo->time.tv_sec = timeo->est_rtt.tv_sec + 4*timeo->dev_rtt.tv_sec;
 	timeo->time.tv_usec = timeo->est_rtt.tv_usec + 4*timeo->dev_rtt.tv_usec;
+
+	while(timeo->time.tv_sec > 1000000) {
+		timeo->time.tv_sec += 1;
+		timeo->time.tv_usec -= 1000000;
+	}
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len){
