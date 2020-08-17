@@ -49,7 +49,7 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
 
-	int filesize = file_stat.st_size;
+	int filesize = htonl(file_stat.st_size);
 	send_tcp(socket_desc, &filesize, sizeof(filesize));
 
 	int offset = 0;
@@ -104,6 +104,7 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 	int filesize;
 	recv_tcp(socket_desc, &filesize, sizeof(filesize));
+	filesize = ntohl(filesize);
 
 	printf("File size is: %d\n", filesize);
 

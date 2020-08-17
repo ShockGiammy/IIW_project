@@ -102,7 +102,7 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 void concat_segm(char *segm, char *to_concat, int max);
 int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);
-void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win);
+void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win, int* bytes_recvd);
 int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win);
 void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte, int flags);
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);

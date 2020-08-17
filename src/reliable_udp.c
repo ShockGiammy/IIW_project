@@ -163,7 +163,7 @@ int count_acked (int min, int max, int acknum) {
 // function called when it's necessary to retx a segment with TCP fast retx
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	bool retransmitted = false;
-	for(int i = 0; i < MAX_BUF_SIZE-1; i++) {
+	for(int i = 0; i < MAX_BUF_SIZE; i++) {
 		// printf("%d == %d ?\n", win.next_to_ack, segments[i].sequence_number);
 		if(win.next_to_ack == segments[i].sequence_number) {
 			make_seg(segments[i], buffer);
@@ -181,12 +181,13 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	printf("\nFinished retx\n");
 }
 
-void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
+void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win, int* bytes_recvd) {
 	tcp *current = *segment_head;
 
 	// check if to_buf was already received
-	printf("buff_in_order: %d < %d ? \n", to_buf->sequence_number, win->last_correctly_acked);
-	if(to_buf->sequence_number < win->last_correctly_acked){
+	printf("buff_in_order: %d < %d ? \n", to_buf->sequence_number, win->tot_acked);
+	if(to_buf->sequence_number < win->tot_acked){
+		printf("buff_in_order: won't buffer segment\n");
 		return;
 	}
 
@@ -194,7 +195,7 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 	// check if to_buf is already in the list
 	while(current != NULL){
 		if(current->sequence_number == to_buf->sequence_number) {
-			printf("segment already in list\n");
+			printf("buff_in_order: segment already in list\n");
 			return;
 		}
 		current = current->next;
@@ -206,12 +207,13 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 		win->last_byte_buffered = to_buf->sequence_number + to_buf->data_length;
 	}
 
+	*bytes_recvd += to_buf->data_length;
 	win->rcvwnd -= to_buf->data_length;
 	printf("Updating rcvwnd to %d\n", win->rcvwnd);
 
 	// if the list is empty, to_buf becomes the head
 	if(*segment_head == NULL){
-		printf("Inserisco in testa, (%d bytes of data)\n", to_buf->data_length);
+		// printf("Inserisco in testa, (%d bytes of data)\n", to_buf->data_length);
 		*segment_head = to_buf;
 		to_buf->next = NULL;
 		return;
@@ -222,7 +224,7 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 
 		// if seq_num of to_buf is > than that of the head, to_buf becomes the new head
 		if( ( *segment_head )->sequence_number > to_buf->sequence_number){
-			printf("Inserisco in testa\n");
+			// printf("Inserisco in testa\n");
 			to_buf->next = *segment_head;
 			*segment_head = to_buf;
 			return;
@@ -236,7 +238,7 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 		do {
 			if(next == NULL){
 				pos_in_list++;
-				printf("Inserisco in posizione %d\n", pos_in_list);
+				// printf("Inserisco in posizione %d\n", pos_in_list);
 				current->next = to_buf;
 				to_buf->next = NULL;
 				return;
@@ -244,7 +246,7 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win) {
 			else if(next->sequence_number > to_buf->sequence_number) {
 				// to_buf must be inserted in the list before the next segment
 				pos_in_list++;
-				printf("Inserisco in posizione %d\n", pos_in_list);
+				// printf("Inserisco in posizione %d\n", pos_in_list);
 				current->next = to_buf;
 				to_buf->next = next;
 				return;
@@ -266,14 +268,14 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win) {
 	while(current != NULL) {
 		// printf(" %d == %d ?\n", current->sequence_number, win->next_to_ack);
 		if((current)->sequence_number == win->next_to_ack) {
-			printf("write_all: Manipolo %d, lunghezza dati %ld, copio in %p\n", current->sequence_number, current->data_length, *buf);
+			// printf("write_all: Manipolo %d, lunghezza dati %ld, copio in %p\n", current->sequence_number, current->data_length, *buf);
 
 			int n = current->data_length;
 			memcpy(*buf, current->data, n);
 			//printf("write_all: \nData: %s\nCopied: %s\n", current->data, *buf);
 			
 			*buf += n;
-			printf("last_to_ack %d -> ", win->last_to_ack);
+			printf("write_all: last_to_ack %d -> ", win->last_to_ack);
 			win->last_to_ack += n;
 			printf("%d\n", win->last_to_ack);
 			win->last_correctly_acked = (current)->sequence_number;
@@ -465,7 +467,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			buf += n_to_copy-1 ;
 			printf("Total bytes read : %d\n", n_read);
 
-			printf("Da copiare : %d\n", n_to_copy);
+			// printf("Da copiare : %d\n", n_to_copy);
 			if(n_to_copy >= 0) {
 				printf("index: %d, max: %d\n", index, MAX_BUF_SIZE);
 				// we check if we can send data without exceeding the max number of bytes on the fly
@@ -749,7 +751,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
 			list_length++;
 			printf("Buffering segment...\n");
-			buffer_in_order(&buf_segm, segment, &recv_win);
+			buffer_in_order(&buf_segm, segment, &recv_win, &bytes_rcvd);
 		}
 
 		if(received_data){
@@ -789,7 +791,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
 					list_length++;
 					printf("Buffering segment...\n");
-					buffer_in_order(&buf_segm, second_segm, &recv_win);
+					buffer_in_order(&buf_segm, second_segm, &recv_win, &bytes_rcvd);
 				}
 			}
 			else if(n == 0){
@@ -816,9 +818,8 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
 		printf("Totale riscontrati %d\n", recv_win.tot_acked);
-		bytes_rcvd = size - recv_win.rcvwnd;
 
-		if(bytes_rcvd == recv_win.rcvwnd) {
+		if(bytes_rcvd == size) {
 			finished = true;
 		}
 		
