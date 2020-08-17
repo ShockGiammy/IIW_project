@@ -21,9 +21,8 @@
 #include <netdb.h>
 #include <net/if.h>
 
+#define MAX_TENTATIVES 3
 
-static int port = 10000;
-const int port_host = 13500;
 cong_struct *cong;
 
 int make_seg(tcp segment, char *send_segm) {
@@ -821,21 +820,34 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
 	new_sock_addr.sin_addr 		  = addr->sin_addr;
-    new_sock_addr.sin_port        = htons(port_host);
 
 	for(int i=0; i< MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\nEnstablishing connection...\n");
 	
 	char address_string[INET_ADDRSTRLEN];
-	inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
+	int tentatives = 0;
 
-	printf("Binding to %s(%d)\n", address_string, ntohs(new_sock_addr.sin_port));
-	
-	if ( bind(socket_descriptor, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
-		fprintf(stderr, "connect: bind error\n%s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-    }
+	for (int i = 0; i < MAX_TENTATIVES; i++) {
+		new_sock_addr.sin_port = getpid() + 1024;
+		if (new_sock_addr.sin_port <= 65536) {
+			inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
+
+			printf("Binding to %s(%d)\n", address_string, ntohs(new_sock_addr.sin_port));
+
+			int bind_value;
+			if (bind_value = bind(socket_descriptor, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
+				fprintf(stderr, "connect: bind error\n%s\n", strerror(errno));
+				tentatives++;
+				if (tentatives == 2) {
+					exit(EXIT_FAILURE);
+				}
+    		}
+			if (bind_value == 0) {
+				break;
+			}
+		}
+	}
 
 	char server_address_string[INET_ADDRSTRLEN];
 	inet_ntop(addr->sin_family, &addr->sin_addr, server_address_string, INET_ADDRSTRLEN);
@@ -922,6 +934,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	int sock_conn = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP);
 	
+	int port = getpid() + 1024;
+
 	struct sockaddr_in new_sock_addr;
 	int new_port = port++;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
