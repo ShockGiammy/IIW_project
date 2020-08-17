@@ -164,7 +164,7 @@ int count_acked (int min, int max, int acknum) {
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	bool retransmitted = false;
 	for(int i = 0; i < MAX_BUF_SIZE; i++) {
-		// printf("%d == %d ?\n", win.next_to_ack, segments[i].sequence_number);
+		printf("%d == %d ?\n", win.next_to_ack, segments[i].sequence_number);
 		if(win.next_to_ack == segments[i].sequence_number) {
 			make_seg(segments[i], buffer);
 			retransmitted = true;
@@ -306,22 +306,20 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data,  int index, int 
 	ack = CHECK_BIT(flags, 0);
 	syn = CHECK_BIT(flags, 1);
 	fin = CHECK_BIT(flags, 2);
-
 	
 	memset(&(segment[index]), 0, sizeof(*segment));
 	memcpy(segment[index].data, data, n_byte);
 	segment[index].data_length = n_byte;
 	fill_struct(&segment[index], wind->next_seq_num, 0, wind->rcvwnd, ack, fin, syn);
-	printf("SEQ_NUM: %d\n", wind->next_seq_num);
+	// printf("SEQ_NUM: %d\n", wind->next_seq_num);
 	//printf("ASF: %d%d%d\n", segment[index].ack, segment[index].syn, segment[index].fin);
-	segment->sequence_number = wind->next_seq_num;
 	
 	wind->next_seq_num += n_byte; // sequence number for the next segment
 	wind->on_the_fly += n_byte;
 	//printf("last_to_ack %d -> ", wind->last_to_ack);
 	wind->last_to_ack += n_byte;
 	//printf("%d\n", wind->last_to_ack);
-	printf("prepare_segment: Copying %d to position %d\n", segment->sequence_number, index);
+	printf("prepare_segment: Copying %d to position %d\n", segment[index].sequence_number, index);
 }
 
 // function used to move the sliding window properly
@@ -814,8 +812,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			finished = true;
 		}
 		
-		printf("Finished? %d\n", finished);
-
 		ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
 		printf("Totale riscontrati %d\n", recv_win.tot_acked);
 
@@ -847,6 +843,15 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		}
 		memset(&ack, 0, sizeof(ack));
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
+
+		printf("Finished? %d\n", finished);
+	}
+
+	if(n < 0){
+		fprintf(stderr, "errore recv: %s\n", strerror(errno));
+	}
+	else{
+		printf("recv timeout...\n");
 	}
 
 	ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
@@ -911,8 +916,9 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	memset(recv_buf, 0, HEAD_SIZE);
 	memset(snd_buf, 0, HEAD_SIZE);
 	memset(&head_rcv, 0, sizeof(tcp));
-	memset(&recv_win, 0, sizeof(slid_win));
-	memset(&sender_wind, 0, sizeof(sender_wind));
+	
+	memset(&recv_win, 0, sizeof(recv_win));
+	memset(&sender_wind, 0, sizeof(recv_win));
 
 	recv_win.last_to_ack = MAX_WIN-MSS;
 
@@ -1000,6 +1006,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	char recv_buf[HEAD_SIZE];
 	memset(recv_buf, 0, HEAD_SIZE);
+	memset(&recv_win, 0, sizeof(recv_win));
+	memset(&sender_wind, 0, sizeof(recv_win));
 
 	tcp head_rcv = { 0 };
 	struct sockaddr_in client_address;
