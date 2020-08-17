@@ -786,7 +786,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				printf("New segment of %d bytes, seq num %d\n", second_segm->data_length, second_segm->sequence_number);
 				memset(recv_buf, 0, MSS+HEAD_SIZE);
 
-				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
+				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= second_segm->sequence_number) && ( second_segm->sequence_number <= recv_win.last_to_ack)) {
 					list_length++;
 					printf("Buffering segment...\n");
 					buffer_in_order(&buf_segm, second_segm, &recv_win, &bytes_rcvd);
