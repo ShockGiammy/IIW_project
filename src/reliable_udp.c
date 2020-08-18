@@ -16,16 +16,18 @@
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include "helper.h"
 #include "reliable_udp.h"
-#include <pthread.h>
+#include <sys/syscall.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <net/if.h>
+#include <pthread.h>
 
 #define MAX_TENTATIVES 3
 
 cong_struct *cong;
 static slid_win recv_win; // the sliding window for the receiver
 static slid_win sender_wind; //sliding window for the sender
+static int fd = -1;
 
 int make_seg(tcp segment, char *send_segm) {
 
@@ -422,8 +424,6 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 }
 
 int send_tcp(int sockd, void* buf, size_t size){
-
-	int fd = create_log_file("server_log.txt");
 	char send_buf[MSS+HEAD_SIZE];
 	char data_buf[MSS];
 	char recv_ack_buf[HEAD_SIZE];
@@ -934,6 +934,19 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len){
+	char log_filename[256] = {0};
+	int tid = syscall(__NR_gettid);
+	snprintf(log_filename, 256, "%d", tid);
+
+	strcat(log_filename, "_client_log_");
+	
+	time_t ltime = time(NULL);
+	strcat(log_filename, asctime(localtime(&ltime)));
+
+	strcat(log_filename, "txt");
+
+	fd = create_log_file(log_filename);
+	
 	tcp head_rcv = (const tcp) {0};
 	char recv_buf[HEAD_SIZE];
 	char snd_buf[HEAD_SIZE];
@@ -1041,6 +1054,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 }
 
 int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
+
 	char recv_buf[HEAD_SIZE];
 	memset(recv_buf, 0, HEAD_SIZE);
 	memset(&recv_win, 0, sizeof(recv_win));
@@ -1128,6 +1142,20 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	printf("Received Ack...\n");
 
 	printf("Connection established\n");
+
+	char log_filename[256] = {0};
+	int tid = syscall(__NR_gettid);
+	snprintf(log_filename, 256, "%d", tid);
+
+	strcat(log_filename, "_server_log_");
+	
+	time_t ltime = time(NULL);
+	strcat(log_filename, asctime(localtime(&ltime)));
+
+	strcat(log_filename, "txt");
+
+	fd = create_log_file(log_filename);
+
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");

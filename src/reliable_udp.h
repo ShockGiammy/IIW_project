@@ -122,5 +122,6 @@ int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind);
 int congestion_control_duplicateAck(slid_win sender_wind);
 int congestion_control_timeout(slid_win sender_wind);
 int check_size_buffer(slid_win sender_wind, int receiver_window);
+char* replace_char(char* str, char find, char replace);
 
 #endif  /*  PG_SOCK_HELP  */
