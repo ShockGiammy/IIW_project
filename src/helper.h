@@ -17,3 +17,5 @@
 
 int SendFile(int socket_desc, char* file_name, char *server_response);
 int RetrieveFile(int socket_desc, char* fname);
+int create_log_file(char *file_name);
+int print_on_log(int log_fd, char *msg);

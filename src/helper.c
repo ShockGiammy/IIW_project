@@ -18,7 +18,7 @@
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include "reliable_udp.h"
 #include "helper.h"
-
+#include <time.h>
 
 #define MAX_LINE  4096
 
@@ -133,4 +133,41 @@ int RetrieveFile(int socket_desc, char* fname) {
 	close(fd);
 	printf("File transfer complete!\n");
 	return 0;		
+}
+
+
+/* This set of function aims to create a log file to keep tracks of server-client interaction, usefull to debug the code
+in case of failure*/
+
+
+int create_log_file(char *file_name) {
+	FILE *file;
+	char path[100] = "LogFiles/";
+	strncat(path, file_name, strlen(file_name));
+	int fd;
+	if(file = fopen(path, "r")) {
+		printf("Qui\n");
+		fd = open(path, O_WRONLY, S_IRWXU);
+	}
+	else {
+		fd = open(path, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
+	}
+	if (fd == -1) {
+		printf("error to create file");
+		return -1;
+	}
+	return fd;
+}
+
+int print_on_log(int log_fd, char *msg) {
+	char *log_msg;
+	memset(log_msg, 0, 1024);
+	time_t ltime;
+	ltime = time(NULL);
+	strncpy(log_msg, asctime(localtime(&ltime)), strlen(asctime(localtime(&ltime)))-1);
+	strcat(log_msg, " : ");
+	strncat(log_msg, msg, strlen(msg));
+
+	lseek(log_fd, 0, SEEK_END);	
+	write(log_fd, log_msg, strlen(log_msg));
 }
