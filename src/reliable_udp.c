@@ -466,7 +466,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		printf("%d < %d ?\n", sender_wind.on_the_fly, sender_wind.max_size);*/
 		if(sender_wind.on_the_fly < 0){
 			fprintf(stderr, "on_the_fly variabile is negative: %d\n", sender_wind.on_the_fly);
-			exit(EXIT_FAILURE);
+			return -1;
 		}
 		if((bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size)) {
 			int n_to_copy = (bytes_left_to_send > MSS)*MSS + (bytes_left_to_send <= MSS)*bytes_left_to_send;
@@ -486,9 +486,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 				prepare_segment(send_segm, &sender_wind, data_buf, index, n_to_copy, 0);
 				int n_buf = make_seg(send_segm[index], send_buf); // we put our segment in a buffer that will be sent over the socket
 				//int n_send = send(sockd, send_buf, n_buf, 0);
-				// printf("Sent %d bytes...\n", n_send);
 
 				int n_send = send_unreliable(sockd, send_buf, n_buf);
+				printf("New segment (seq_num, data_length): (%d, %d)\n", send_segm[index].sequence_number, send_segm[index].data_length);
+				printf("Sent %d bytes...\n", n_send);
 				//printf("Sent %d bytes(unreliable)...\n", n_send);
 				memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 				memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
@@ -510,7 +511,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				gettimeofday(&finish_rtt, NULL);
 				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
 				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					printf("Sender error setting opt\n%s\n", strerror(errno));
+					printf("Sender error setting opt(1)\n%s\n", strerror(errno));
 				}
 				// printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 				memset(&recv_segm, 0, sizeof(recv_segm));
@@ -580,7 +581,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	send_timeo.time.tv_sec = 0; // we set 6 sec of timeout, we will estimate it in another moment
 	send_timeo.time.tv_usec = 0;
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&send_timeo.time, sizeof(send_timeo.time)) == -1) {
-		printf("Sender error setting opt\n");
+		printf("Sender error setting opt(2)\n");
 	}
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	//printf("Finished transmission (%d bytes)...\n", size - bytes_left_to_send);
@@ -743,9 +744,8 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			fprintf(stderr, "recv: no bytes read\n%s\n", strerror(errno));
 		}
 		else if(n == 0){
-			printf("TO expired\n");
-			finished = true;
-			continue;
+			printf("Main TO expired (was still expecting bytes), terminating...\n");
+			break;
 		};
 		
 		tcp *segment = malloc(sizeof(tcp));
@@ -758,7 +758,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			close_server_tcp(sockd);
 		}
 		
-		//printf("New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
+		printf("New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
 		
 		//printf("%d <= %d && %d <= %d\n", recv_win.next_to_ack, segment->sequence_number, segment->sequence_number, recv_win.last_to_ack);
@@ -772,9 +772,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		if(received_data){
 			recv_timeout.tv_sec = 0;
-			recv_timeout.tv_usec = 500000;
+			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				printf("Error while setting options");
+				fprintf(stderr, "Error while setting options, RECV_TIMEOUT_SHORT_USEC\n");
 				return -1;
 			}
 		}
@@ -782,7 +782,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			recv_timeout.tv_sec = RECV_TIMEOUT_SEC;
 			recv_timeout.tv_usec = 0;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				printf("Error while setting options");
+				fprintf(stderr, "Error while setting options, RECV_TIMEOUT_SEC\n");
 				return -1;
 			}
 		}
@@ -811,7 +811,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				}
 			}
 			else if(n == 0){
-				printf("TO expired\n");
+				printf("TO delayed ack expired\n");
 				finished = true;
 				continue;
 			}
@@ -869,7 +869,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		fprintf(stderr, "errore recv: %s\n", strerror(errno));
 	}
 	else{
-		printf("recv timeout...\n");
+		printf("Main timeout expired...\n");
 	}
 
 	ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win);
@@ -926,7 +926,7 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 	timeo->time.tv_sec = timeo->est_rtt.tv_sec + 4*timeo->dev_rtt.tv_sec;
 	timeo->time.tv_usec = timeo->est_rtt.tv_usec + 4*timeo->dev_rtt.tv_usec;
 
-	while(timeo->time.tv_sec > 1000000) {
+	while(timeo->time.tv_usec > 1000000) {
 		timeo->time.tv_sec += 1;
 		timeo->time.tv_usec -= 1000000;
 	}

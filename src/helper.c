@@ -108,15 +108,18 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 	printf("File size is: %d\n", filesize);
 
+	int tot_bytes_recvd = 0;
 	int bytes_recvd = 0;
 	int bytes_wrttn = 0;
 	int tot_bytes_wr = 0;
+	int recv_bytes_buffer = BUFSIZE < filesize ? BUFSIZE : filesize;
 
 	while(tot_bytes_wr < filesize ){
-		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, BUFSIZE)) < 0){
+		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
 			fprintf(stderr, "RetrieveFile: %s\n", strerror(errno));
 			return -1;
 		}
+		tot_bytes_recvd += bytes_recvd;
 		printf("Received %d new bytes...\n", bytes_recvd);
 		if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
 			perror("File transmission error...\n");
@@ -125,8 +128,8 @@ int RetrieveFile(int socket_desc, char* fname) {
 		tot_bytes_wr += bytes_wrttn;
 		printf("%d / %d bytes written...\n", tot_bytes_wr, filesize);
 		memset(buffer, 0, BUFSIZE);
+		recv_bytes_buffer = (filesize - tot_bytes_recvd) < BUFSIZE ? (filesize - tot_bytes_recvd) : BUFSIZE;
 	}
-
 	close(fd);
 	printf("File transfer complete!\n");
 	return 0;		
