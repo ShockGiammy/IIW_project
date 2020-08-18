@@ -423,6 +423,7 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 
 int send_tcp(int sockd, void* buf, size_t size){
 
+	int fd = create_log_file("server_log.txt");
 	char send_buf[MSS+HEAD_SIZE];
 	char data_buf[MSS];
 	char recv_ack_buf[HEAD_SIZE];
@@ -524,6 +525,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				printf("%d == %d ?\n", recv_segm.ack_number, sender_wind.next_to_ack);
 				printf("else %d < %d && %d <= %d ?\n", sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
 				*/
+				print_on_log(fd, "Received acks...\n");
 				if(recv_segm.ack_number == sender_wind.next_to_ack) {
 					// printf("Ricevuto un riscontro duplicato\n");
 					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
