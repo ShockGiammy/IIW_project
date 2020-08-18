@@ -10,7 +10,7 @@
 #include <unistd.h>             /*  for ssize_t data type  */
 #include <math.h>
 #include <sys/time.h>
-
+#include <limits.h>
 
 
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
