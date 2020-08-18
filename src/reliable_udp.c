@@ -960,9 +960,9 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	
 	char address_string[INET_ADDRSTRLEN];
 	int tentatives = 0;
+	new_sock_addr.sin_port = getpid() + 1024;
 
 	for (int i = 0; i < MAX_TENTATIVES; i++) {
-		new_sock_addr.sin_port = getpid() + 1024;
 		if (new_sock_addr.sin_port <= 65536) {
 			inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
 
@@ -980,6 +980,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 				break;
 			}
 		}
+		new_sock_addr.sin_port = new_sock_addr.sin_port + PROCESSES;
 	}
 
 	char server_address_string[INET_ADDRSTRLEN];
@@ -1074,7 +1075,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	int port = getpid() + 1024;
 
 	struct sockaddr_in new_sock_addr;
-	int new_port = port++;
+	int new_port = port + PROCESSES;
+
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
 	new_sock_addr.sin_addr 		  = client_address.sin_addr;

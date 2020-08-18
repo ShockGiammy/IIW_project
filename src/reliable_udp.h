@@ -26,6 +26,8 @@
 #define RECV_TIMEOUT_SHORT_USEC 1 << 19
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
+#define PROCESSES 10
+
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 
 typedef struct tcp_segment
