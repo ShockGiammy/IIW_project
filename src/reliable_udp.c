@@ -209,6 +209,7 @@ void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win, int* bytes_
 	*bytes_recvd += to_buf->data_length;
 	win->rcvwnd -= to_buf->data_length;
 	if(win->rcvwnd < 0) {
+		printf("rcvwnd is negative!\n");
 		win->rcvwnd = 0;
 		return;
 	}
@@ -729,7 +730,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	int bytes_rcvd = 0;
 
 	while (!finished && (n = recv(sockd, recv_buf, MSS+HEAD_SIZE, 0)) > 0) {
-		//printf("Received %d bytes: %s\n", n, recv_buf);
+		printf("Received %d bytes: %s\nrcvwnd: %d\n", n, recv_buf, recv_win.rcvwnd);
 
 		recv_timeout.tv_sec = 0;
 		recv_timeout.tv_usec = 0;
@@ -825,7 +826,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		}
 
 		if(recv_win.rcvwnd <= 0){
-			printf("Receiver cannot receive any data...\n");
+			printf("Receiver cannot receive any more data...\nrcvwnd: %d\n", recv_win.rcvwnd);
 			finished = true;
 		}
 		

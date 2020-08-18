@@ -72,19 +72,19 @@ void *evadi_richiesta(void *socket_desc) {
 
 			DIR *dr = opendir("DirectoryFiles");
 		    if (dr == NULL) {
-	    		char result[50] = "Could not open current directory\n";
+	    		char result[] = "Could not open current directory\n";
 		    	printf("%s\n", result);
-	        	send_tcp(socket, result, sizeof(result));
+	        	send_tcp(socket, result, strlen(result));
 	    	}
 
 			while ((de = readdir(dr)) != NULL){
     	        char string[50];
         	    strcpy(string, de->d_name);
 	        	printf("%s\n", string);
-			    send_tcp(socket, string, sizeof(string) + 1);
+			    send_tcp(socket, string, strlen(string));
     		}
 			char stop[] = "STOP";
-			send_tcp(socket, stop, sizeof(stop) +1);
+			send_tcp(socket, stop, strlen(stop));
 	    	closedir(dr);
 	    	printf("file listing completed \n");
 		}
