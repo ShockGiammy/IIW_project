@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 		}
 		if(strcmp(command, "list\n") == 0) {
 			send_tcp(conn_s, command, strlen(command));
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			memset(command, 0, sizeof(char)*(strlen(command)));
 			printf("Files in the current directory : \n");
 			for(;;){
 				memset(&fname, '\0', 50);
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command,"get\n") == 0) {
 			char response[BUFSIZ];
 			send_tcp(conn_s, command, strlen(command));
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			memset(command, 0, sizeof(char)*(strlen(command)));
 
 			int n = recv_tcp(conn_s, response, BUFSIZ);
 			if( n < 0 || ( strcmp(response, "ready") != 0 )){
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
 			if( RetrieveFile(conn_s, fname) < 0 ){
 				fprintf(stderr, "RetrieveFile: error...\n");
 			}
-			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
+			memset(fname, 0, sizeof(char)*(strlen(fname)));
 			memset(response, 0, BUFSIZ);
 		}
 
@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 			}
 
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			memset(command, 0, sizeof(char)*(strlen(command)));
 
 			n = recv_tcp(conn_s, server_response, BUFSIZ);
 			if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
@@ -210,13 +210,13 @@ int main(int argc, char *argv[]) {
 		}
 		
 		else if(strcmp(command,"help\n") == 0){
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			memset(command, 0, sizeof(char)*(strlen(command)));
 			show_menu();
 		}
 
 		else {
 			printf("Command not valid\n");
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
+			memset(command, 0, sizeof(char)*(strlen(command)));
 		}
 	}while(1);
 }

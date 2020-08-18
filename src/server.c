@@ -61,6 +61,7 @@ void *evadi_richiesta(void *socket_desc) {
 	printf("Connection estabilished with %s\n", client);
 
 	do {
+		printf("Waiting client request...\n");
 		recv_tcp(socket, client_request, MAX_LINE-1);
 		
 		if (strcmp(client_request, "list\n") == 0) {
@@ -91,6 +92,7 @@ void *evadi_richiesta(void *socket_desc) {
 		else if (strcmp(client_request, "get\n") == 0) {
 			printf("command GET entered\n");
 			fflush(stdout);
+			memset(filesName, 0, BUFSIZ);
 			
 			// tell client that the server is ready
 			send_tcp(socket, "ready", 6);

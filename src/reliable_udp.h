@@ -10,17 +10,20 @@
 #include <unistd.h>             /*  for ssize_t data type  */
 #include <math.h>
 #include <sys/time.h>
+#include <limits.h>
 
 
-
-#define LISTENQ        (1024)   /*  Backlog for listen()   */
-#define MSS             1500    // we define the MSS for the TCP segment as a constant value
-#define HEAD_SIZE       19
-#define SOCKET_TYPE     SOCK_DGRAM
-#define MAX_WIN         MSS * 100
-#define MAX_BUF_SIZE    MAX_WIN / MSS
-#define MAX_LINE  4096
-#define MAX_LINE_DECOR 30
+#define LISTENQ          (1024)   /*  Backlog for listen()   */
+#define MSS               1500    // we define the MSS for the TCP segment as a constant value
+#define HEAD_SIZE         19
+#define SOCKET_TYPE       SOCK_DGRAM
+#define MAX_WIN           MSS * 100
+#define MAX_BUF_SIZE      MAX_WIN / MSS
+#define MAX_LINE          4096
+#define MAX_LINE_DECOR    30
+#define MAX_ATTMPTS_RETX  10
+#define RECV_TIMEOUT_SEC  1 << 11
+#define RECV_TIMEOUT_SHORT_USEC 1 << 19
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
@@ -66,6 +69,9 @@ typedef struct sliding_window {
   int last_correctly_acked; // the last segment correctly acked, usefull for retx in case of loss / 3 dupl. ack
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
   //int congWin;
+  int rcvwnd;
+  int last_byte_buffered;
+  int bytes_acked_current_transmission;
 } slid_win;
 
 typedef struct tcp_timeout_struct {
@@ -93,15 +99,15 @@ int close_client_tcp(int sockd);
 void close_server_tcp(int sockd);
 int make_seg(tcp segment, char *send_segm);
 int extract_segment(tcp *segment, char *recv_segm);
-void fill_struct(tcp *segment, int seq_num, int ack_num, int recv, bool is_ack, bool is_fin, bool is_syn, char *data);
+void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, unsigned long recv, bool is_ack, bool is_fin, bool is_syn);
 void concat_segm(char *segm, char *to_concat, int max);
 int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);
-void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win);
-int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, bool *is_finished);
+void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win, int* bytes_recvd);
+int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win);
 void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte, int flags);
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);
-bool ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win);
+void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win);
 int send_unreliable(int sockd, char *segm_to_go, int n_bytes);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
