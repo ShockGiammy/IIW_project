@@ -170,8 +170,8 @@ int create_log_file(char *file_name) {
 }
 
 int print_on_log(int log_fd, char *msg) {
-	char *log_msg;
-	memset(log_msg, 0, 1024);
+	char log_msg[LOG_MSG_SIZE];
+	memset(log_msg, 0, LOG_MSG_SIZE);
 	time_t ltime;
 	ltime = time(NULL);
 	strncpy(log_msg, asctime(localtime(&ltime)), strlen(asctime(localtime(&ltime)))-1);

@@ -25,8 +25,9 @@
 #define MAX_ATTMPTS_RETX  10
 #define RECV_TIMEOUT_SEC  1 << 11
 #define RECV_TIMEOUT_SHORT_SEC 1
-#define RECV_TIMEOUT_SHORT_USEC 0
+#define RECV_TIMEOUT_SHORT_USEC 1 << 8
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
+#define MAX_ATTMPTS_PORT_SEARCH 3
 
 #define PROCESSES 10
 
@@ -109,7 +110,7 @@ int count_acked (int min, int max, int acknum);
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc);
 void buffer_in_order(tcp **segment_head, tcp *to_buf, slid_win *win);
 int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, int* bytes_recvd);
-void prepare_segment(tcp *segment, slid_win *wind, char *data,  int index, int n_byte, int flags);
+void prepare_segment(tcp *segment, slid_win *wind, char *data,  int ack_num, int index, int n_byte, int flags);
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);
 void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win, int* bytes_recvd);
 int send_unreliable(int sockd, char *segm_to_go, int n_bytes);

@@ -12,6 +12,8 @@
 #include <sys/time.h>
 
 #define BUFSIZE	  160000
+#define LOG_MSG_SIZE 1024
+
 
 /*  Function declarations  */
 
