@@ -22,9 +22,9 @@
 #include <net/if.h>
 #include <pthread.h>
 
-static cong_struct cong;
-__thread slid_win recv_win; // the sliding window for the receiver
-__thread slid_win sender_wind; //sliding window for the sender
+static __thread cong_struct cong;
+static __thread slid_win recv_win; // the sliding window for the receiver
+static __thread slid_win sender_wind; //sliding window for the sender
 
 int new_port = 0;
 static int fd = -1;
@@ -498,6 +498,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	memset(data_buf, 0, MSS);
 
+	if(cong.cong_win == 0){
+		cong.state = 0;
+		cong.cong_win = MSS;
+		cong.threshold = 64000;
+		cong.support_variable = 0;
+	}
+
 	int bytes_left_to_send = size;
 	tcp send_segm[MAX_BUF_SIZE]; // keeps the segment that we send, so that we can perform resending and/or acknowledge.
 	tcp recv_segm = (const tcp) { 0 }; // used to unpack the ack and see if everything was good
@@ -550,6 +557,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 		}
 
 		snprintf(msg, LOG_MSG_SIZE, "send_tcp: Bytes left to send: %d / %ld\n", bytes_left_to_send, size);
+		print_on_log(fd, msg);
+		memset(msg, 0, LOG_MSG_SIZE);
+
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: Need to send segments? -> %d > 0 && %d < %d\n", bytes_left_to_send, sender_wind.on_the_fly, sender_wind.max_size);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
@@ -850,6 +861,10 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	// the head for our segment linked list
 	tcp *buf_segm = NULL;
 
+	if(recv_win.last_to_ack == 0){
+		recv_win.last_to_ack = MAX_WIN-MSS;
+	}
+
 	tcp ack;
 	int list_length = 0;
 	recv_win.rcvwnd = size;
@@ -896,7 +911,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		//printf("%d <= %d && %d <= %d\n", recv_win.next_to_ack, segment->sequence_number, segment->sequence_number, recv_win.last_to_ack);
 
 		// buffer segments
-		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
+		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) 
+			&& ( segment->sequence_number <= recv_win.last_to_ack) && (segment->data_length != 0)) {
+			
 			list_length++;
 
 			snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Buffering segment...\n");
@@ -908,7 +925,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		if(received_data){
 			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
-			recv_timeout.tv_usec = 0;
+			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
 				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SHORT_USEC\n");
 				return -1;
@@ -942,7 +959,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 				memset(recv_buf, 0, MSS+HEAD_SIZE);
 
-				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= second_segm->sequence_number) && ( second_segm->sequence_number <= recv_win.last_to_ack)) {
+				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= second_segm->sequence_number) 
+					&& ( second_segm->sequence_number <= recv_win.last_to_ack) && (second_segm->data_length != 0)) {
+					
 					list_length++;
 
 					snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Buffering segment...\n");
@@ -997,7 +1016,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout));
 
 		if(received_data){
-			recv_timeout.tv_sec = 0;
+			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
 			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
 				fprintf(stderr, "recv_tcp: Error while setting options");
@@ -1095,19 +1114,6 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len){
-	
-	char log_filename[256] = {0};
-	int tid = syscall(__NR_gettid);
-	snprintf(log_filename, 256, "%d", tid);
-
-	strcat(log_filename, "_client_log_");
-	
-	time_t ltime = time(NULL);
-	strcat(log_filename, asctime(localtime(&ltime)));
-
-	strcat(log_filename, "txt");
-
-	fd = create_log_file(log_filename);
 		
 	tcp head_rcv = (const tcp) {0};
 	char recv_buf[HEAD_SIZE];
@@ -1118,15 +1124,6 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	
 	memset(&recv_win, 0, sizeof(recv_win));
 	memset(&sender_wind, 0, sizeof(sender_wind));
-
-	memset(&cong, 0, sizeof(cong));
-	cong.state = 0;
-	cong.cong_win = MSS;
-	cong.threshold = 64000;
-	cong.support_variable = 0;
-
-	recv_win.last_to_ack = MAX_WIN-MSS;
-
 
 	struct sockaddr_in server_addr;
 	bzero(&server_addr, sizeof(server_addr));
@@ -1225,21 +1222,11 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	char recv_buf[HEAD_SIZE];
 	memset(recv_buf, 0, HEAD_SIZE);
-	memset(&recv_win, 0, sizeof(recv_win));
-	memset(&sender_wind, 0, sizeof(sender_wind));
-
-	memset(&cong, 0, sizeof(cong));
-	cong.state = 0;
-	cong.cong_win = MSS;
-	cong.threshold = 64000;
-	cong.support_variable = 0;
 
 	tcp head_rcv = { 0 };
 	struct sockaddr_in client_address;
 	bzero(&client_address, sizeof(client_address));
 	struct in_addr addr_from_client;
-
-	recv_win.last_to_ack = MAX_WIN-MSS;
 
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
@@ -1251,20 +1238,6 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
 		return -1;
 	}
-	
-	// Create log file
-	char log_filename[256] = {0};
-	int tid = syscall(__NR_gettid);
-	snprintf(log_filename, 256, "%d", tid);
-
-	strcat(log_filename, "_server_log_");
-	
-	time_t ltime = time(NULL);
-	strcat(log_filename, asctime(localtime(&ltime)));
-
-	strcat(log_filename, "txt");
-
-	fd = create_log_file(log_filename);
 
 	// get client information
 	char address_string[INET_ADDRSTRLEN];
@@ -1383,8 +1356,6 @@ int close_client_tcp(int sockd){
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");
-
-	//free(cong);
 	
 	return res;
 }
@@ -1430,7 +1401,21 @@ void close_server_tcp(int sockd){
 		printf("-");
 	printf("\n");
 
-	//free(cong);
-
 	pthread_exit(&res);
+}
+
+void init_log(char* part_filename){
+	// Create log file
+	char log_filename[256] = {0};
+	int tid = syscall(__NR_gettid);
+	snprintf(log_filename, 256, "%d", tid);
+
+	strcat(log_filename, part_filename);
+	
+	time_t ltime = time(NULL);
+	strcat(log_filename, asctime(localtime(&ltime)));
+
+	strcat(log_filename, "txt");
+
+	fd = create_log_file(log_filename);
 }
