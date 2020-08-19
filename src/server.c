@@ -40,7 +40,7 @@ void *evadi_richiesta(void *socket_desc) {
 	char client_request[BUFSIZ];
 	char server_response[BUFSIZ];
 
-	char client[MAX_LINE];
+	char client[BUFSIZ];
 	tcp temp;
 
 	struct stat stat_buf;
@@ -48,19 +48,19 @@ void *evadi_richiesta(void *socket_desc) {
 	int socket = *(int*)socket_desc;
 	free((int*)socket_desc);
 
-	int res = recv_tcp(socket, client_request, MAX_LINE-1);
+	int res = recv_tcp(socket, client_request, BUFSIZ);
 	if(res < 0){
 		res = 0;
 		pthread_exit(&res);
 	}
 
-	strcpy(client, client_request);
-	memset(client_request, 0, sizeof(char)*(strlen(client_request)+1));
+	strncpy(client, client_request, BUFSIZ);
+	memset(client_request, 0, BUFSIZ);
 	printf("Connection estabilished with %s\n", client);
 
 	do {
 		printf("Waiting client request...\n");
-		recv_tcp(socket, client_request, MAX_LINE-1);
+		recv_tcp(socket, client_request, BUFSIZ);
 		
 		if (strcmp(client_request, "list\n") == 0) {
 			printf("command LIST entered\n");

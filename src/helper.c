@@ -18,7 +18,7 @@
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include "reliable_udp.h"
 #include "helper.h"
-
+#include <time.h>
 
 #define MAX_LINE  4096
 
@@ -133,4 +133,60 @@ int RetrieveFile(int socket_desc, char* fname) {
 	close(fd);
 	printf("File transfer complete!\n");
 	return 0;		
+}
+
+
+/* This set of function aims to create a log file to keep tracks of server-client interaction, usefull to debug the code
+in case of failure*/
+
+
+int create_log_file(char *file_name) {
+	FILE *file;
+
+	char* log_filename = malloc(sizeof(char)*strlen(file_name)+1);
+	memset(log_filename, 0, sizeof(char)*strlen(file_name)+1);
+	strcpy(log_filename, file_name);
+
+	replace_char(log_filename, ' ', '-');
+	replace_char(log_filename, '\n', '.');
+	replace_char(log_filename, ':', '_');
+
+	printf("Creating log, filename: %s\n", log_filename);
+	char path[100] = "LogFiles/";
+	strncat(path, log_filename, strlen(log_filename));
+	int fd;
+	if(file = fopen(path, "r")) {
+		fd = open(path, O_WRONLY, S_IRWXU);
+	}
+	else {
+		fd = open(path, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
+	}
+	if (fd == -1) {
+		fprintf(stderr, "log file creation error\n");
+		return -1;
+	}
+	printf("Log file created, fd: %d\n", fd);
+	return fd;
+}
+
+int print_on_log(int log_fd, char *msg) {
+	char log_msg[LOG_MSG_SIZE];
+	memset(log_msg, 0, LOG_MSG_SIZE);
+	time_t ltime;
+	ltime = time(NULL);
+	strncpy(log_msg, asctime(localtime(&ltime)), strlen(asctime(localtime(&ltime)))-1);
+	strcat(log_msg, " : ");
+	strncat(log_msg, msg, strlen(msg));
+
+	lseek(log_fd, 0, SEEK_END);	
+	write(log_fd, log_msg, strlen(log_msg));
+}
+
+char* replace_char(char* str, char find, char replace){
+    char *current_pos = strchr(str,find);
+    while (current_pos){
+        *current_pos = replace;
+        current_pos = strchr(current_pos,find);
+    }
+    return str;
 }
