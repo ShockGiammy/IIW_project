@@ -26,6 +26,7 @@
 cong_struct *cong;
 static slid_win recv_win; // the sliding window for the receiver
 static slid_win sender_wind; //sliding window for the sender
+int new_port = 0;
 
 int make_seg(tcp segment, char *send_segm) {
 
@@ -698,7 +699,7 @@ int check_size_buffer(slid_win sender_wind, int receiver_window) {
 		sender_wind.max_size = receiver_window;
 	}
 
-	//printf("congWin %d\n", cong->cong_win);
+	printf("congWin %d\n", cong->cong_win);
 	//printf("threshold %d\n", cong->threshold);
 	//printf("receiver_window %d\n", receiver_window);
 	//printf("max_size %d\n", sender_wind.max_size);
@@ -1075,7 +1076,12 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	int port = getpid() + 1024;
 
 	struct sockaddr_in new_sock_addr;
-	int new_port = port + PROCESSES;
+	if (new_port == 0) {
+		new_port = port + PROCESSES;
+	}
+	else {
+		new_port = new_port + PROCESSES;
+	}
 
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
