@@ -575,7 +575,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			bytes_left_to_send -= n_to_copy;
 			data_buf[n_to_copy] = 0;
 			n_read += n_to_copy;
-			buf += n_to_copy-1 ;
+			buf += n_to_copy;
 
 			if(n_to_copy >= 0) {
 				snprintf(msg, LOG_MSG_SIZE, "send_tcp\nindex: %d, max: %d\n", index, MAX_BUF_SIZE);

@@ -11,7 +11,7 @@
 #include <math.h>
 #include <sys/time.h>
 
-#define BUFSIZE	  160000
+#define BUFSIZE	  159000
 #define LOG_MSG_SIZE 1024
 
 
