@@ -27,5 +27,5 @@ int RetrieveFile(int socket_desc, char* fname);
 int create_log_file(char *file_name);
 int print_on_log(int log_fd, char *msg);
 void signal_threads(thread_list_t* list_head, int sigo);
-int insert_thread_in_list(int tid, thread_list_t** head);
+int insert_thread_in_list(pthread_t tid, thread_list_t** head);
 void free_thread_list(thread_list_t* head);

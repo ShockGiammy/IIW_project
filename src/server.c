@@ -33,7 +33,6 @@ struct	  sockaddr_in their_addr;
 
 static __thread int sock_descriptor = -1;
 thread_list_t* thread_list = NULL;
-static pthread_t thread = -1;
 
 int gen_id;
 
@@ -41,14 +40,11 @@ int ParseCmdLine(int argc, char *argv[], char **szPort);
 
 void _handler(int sigo) {
 	int res = EXIT_SUCCESS;
-	printf("\nsd is %d, I am %d\n", sock_descriptor, pthread_self());
 	if(sock_descriptor == -1){
 		if(thread_list != NULL){
 			signal_threads(thread_list, sigo);
 		}
 		free_thread_list(thread_list);
-		// if(thread != -1)
-		// 	pthread_kill(thread, sigo);
 		pthread_exit(&res);
 	}
 	else if(close_initiator_tcp(sock_descriptor) == -1) {
@@ -76,7 +72,6 @@ void *evadi_richiesta(void *socket_desc) {
 	init_log("_server_log_");
 
 	sock_descriptor = socket;
-	printf("I'm thread %d and my sd is %d\n", pthread_self(), sock_descriptor);
 
 	signal(SIGINT, _handler);
 
@@ -202,7 +197,6 @@ int process_manager(int list_s) {
 			printf("Errore server : impossibile creare il thread \n");
 			exit(-1);
 		}
-		// thread = tid;
 		insert_thread_in_list(tid, &thread_list);
 	}
 }
