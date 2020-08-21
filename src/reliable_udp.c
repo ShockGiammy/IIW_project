@@ -315,7 +315,7 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, int* by
 		memset(msg, 0, LOG_MSG_SIZE);
 
 		if((current)->sequence_number == win->next_to_ack) {
-			snprintf(msg, LOG_MSG_SIZE, "write_all: Manipolo %d, lunghezza dati %ld, copio in %p\n", current->sequence_number, current->data_length, *buf);
+			snprintf(msg, LOG_MSG_SIZE, "write_all: Manipolo %d, lunghezza dati %d, copio in %p\n", current->sequence_number, current->data_length, *buf);
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
@@ -480,7 +480,7 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 
 	// 1/20 % of probability to lose the segment
 	if(p != 0) {
-		snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success...\n", segm_to_go);
+		snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success...\n");
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 		
@@ -539,7 +539,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	while(bytes_left_to_send > 0 || sender_wind.bytes_acked_current_transmission < size) {
 
-		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d bytes acked out of %d\n%d < 0 ?\n", sender_wind.bytes_acked_current_transmission, size, sender_wind.on_the_fly);
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d bytes acked out of %ld\n%d < 0 ?\n", sender_wind.bytes_acked_current_transmission, size, sender_wind.on_the_fly);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
@@ -548,7 +548,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			return -1;
 		}
 
-		snprintf(msg, LOG_MSG_SIZE, "send_tcp: Bytes left to send: %d / %d\n", bytes_left_to_send, size);
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: Bytes left to send: %d / %ld\n", bytes_left_to_send, size);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
@@ -589,7 +589,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		gettimeofday(&start_rtt, NULL);
 
 		// we have read the max number of data, we proceed with the sending in pipelining
-		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d >= %d || %d >= %d\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d >= %ld || %d >= %d\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
@@ -677,7 +677,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		}
 	}
 	
-	snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d bytes acked out of %d bytes to send\n", sender_wind.bytes_acked_current_transmission, size);
+	snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d bytes acked out of %ld bytes to send\n", sender_wind.bytes_acked_current_transmission, size);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 	
@@ -1085,7 +1085,7 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 		timeo->time.tv_usec -= 1000000;
 	}
 
-	snprintf(msg, LOG_MSG_SIZE, "estimate_timeout: TO: %d s, %d us\n", timeo->time.tv_sec, timeo->time.tv_usec);
+	snprintf(msg, LOG_MSG_SIZE, "estimate_timeout: TO: %ld s, %ld us\n", timeo->time.tv_sec, timeo->time.tv_usec);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 }
