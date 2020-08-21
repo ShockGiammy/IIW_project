@@ -425,9 +425,8 @@ int send_flags(int sockd, int flags){
 
 	make_seg(segment, buf);
 	int ret = send_unreliable(sockd, buf, HEAD_SIZE);
-	printf("return is %d\n", ret);
 	if(ret == -1){
-		printf("send_unreliable error: %s\n", strerror(errno));
+		fprintf(stderr, "send_unreliable error: %s\n", strerror(errno));
 	}
 	return ret;
 }
@@ -1374,6 +1373,7 @@ void close_receiver_tcp(int sockd){
 
 	char response[MAX_LINE];
 
+	printf("\n");
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");

@@ -98,8 +98,29 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
+	fd_set set_sock_stdin = { 0 };
+	FD_ZERO(&set_sock_stdin);
+	FD_SET(STDIN_FILENO, &set_sock_stdin);
+	FD_SET(conn_s, &set_sock_stdin);
+
+	fd_set read_set;
+	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
+
 	/* connessione */
 	printf("Insert a username: ");
+	fflush(stdout);
+
+	if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
+		perror("select error\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// might receive connecion termination from server
+	if(FD_ISSET(conn_s, &set_sock_stdin)){
+		char recv_buf[HEAD_SIZE] = { 0 };
+		recv_tcp(conn_s, recv_buf, HEAD_SIZE);
+	}
+
 	if(fgets(username,39,stdin) == NULL) {
 		printf("fgets error\n");
 		if(close(conn_s) == -1) {
@@ -113,20 +134,13 @@ int main(int argc, char *argv[]) {
 	printf("Welcome to the server, %s\n", username);
 	show_menu();
 
-	fd_set set_sock_stdin = { 0 };
-	FD_ZERO(&set_sock_stdin);
-	FD_SET(STDIN_FILENO, &set_sock_stdin);
-	FD_SET(conn_s, &set_sock_stdin);
-
-	fd_set read_set;
-	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
-
 	do{
 		if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
 			perror("select error\n");
 			exit(EXIT_FAILURE);
 		}
 
+		// might receive connecion termination from server
 		if(FD_ISSET(conn_s, &set_sock_stdin)){
 			char recv_buf[HEAD_SIZE] = { 0 };
 			recv_tcp(conn_s, recv_buf, HEAD_SIZE);

@@ -4,12 +4,10 @@
   
 */
 
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/sendfile.h>
 #include <fcntl.h>
 #include <sys/socket.h>       /*  socket definitions        */
 #include <sys/types.h>        /*  socket types              */
@@ -19,11 +17,10 @@
 #include "reliable_udp.h"
 #include "helper.h"
 #include <time.h>
+#include <signal.h>
+#include <pthread.h>
 
 #define MAX_LINE  4096
-
-
-/*  Read a line from a socket  */
 
 
 int SendFile(int socket_desc, char* file_name, char* response) {
@@ -189,4 +186,66 @@ char* replace_char(char* str, char find, char replace){
         current_pos = strchr(current_pos,find);
     }
     return str;
+}
+
+void free_thread_list(thread_list_t* head){
+	printf("Freeing thread list\n");
+	if( head == NULL )
+		return;
+	
+	thread_list_t* prev = head;
+	thread_list_t* curr = head->next;
+	
+	if(curr == NULL){
+		free(prev);
+		return;
+	}
+	while(curr != NULL){
+		free(prev);
+		prev = curr;
+		curr = curr->next;
+	}
+	printf("Finished freeing thread list\n");
+}
+
+int insert_thread_in_list(int tid, thread_list_t** head){
+	printf("Inserting thread %d in list\n", tid);
+	if(head == NULL){
+		perror("Pointer to list head is null!");
+		return -1;
+	}
+	if(*head == NULL){
+		thread_list_t* new_head = malloc(sizeof(thread_list_t));
+		memset(new_head, 0, sizeof(thread_list_t));
+		new_head->tid = tid;
+		new_head->next = NULL;
+		*head = new_head;
+		return 0;
+	}
+	else{
+		thread_list_t* new_element = malloc(sizeof(thread_list_t));
+		if(new_element == NULL){
+			return -1;
+		}
+		memset(new_element, 0, sizeof(thread_list_t));
+		new_element->next = *head;
+		new_element->tid = tid;
+		*head = new_element;
+		return 0;
+	}
+}
+
+void signal_threads(thread_list_t* list_head, int sigo){
+	thread_list_t* current = list_head;
+	while(current != NULL){
+		printf("Signaling %d to thread %d\n", sigo, current->tid);
+		printf("prova\n");
+		if ( pthread_kill(current->tid, sigo) != 0 ){
+			perror("pthread_kill error\n");
+			return;
+		}
+		printf("Signaling next one\n");
+		current = current->next;
+	}
+	printf("Finished signaling threads\n");
 }

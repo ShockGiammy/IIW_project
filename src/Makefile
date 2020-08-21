@@ -22,7 +22,7 @@ reliable_udp.o: reliable_udp.c reliable_udp.h
 	gcc -o reliable_udp.o reliable_udp.c -c
 
 helper.o: helper.c helper.h
-	gcc -o helper.o helper.c -c
+	gcc -o helper.o helper.c -c -pthread
 
 manage_client.o : manage_client.c manage_client.h
 	gcc -o manage_client.o manage_client.c -c

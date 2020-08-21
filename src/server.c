@@ -10,6 +10,7 @@
 #include <sys/stat.h>   	  /*  stat for files transfer   */
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
+#include <sys/syscall.h>
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -31,6 +32,7 @@ struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
 
 static __thread int sock_descriptor = -1;
+thread_list_t* thread_list = NULL;
 static pthread_t thread = -1;
 
 int gen_id;
@@ -39,18 +41,21 @@ int ParseCmdLine(int argc, char *argv[], char **szPort);
 
 void _handler(int sigo) {
 	int res = EXIT_SUCCESS;
+	printf("\nsd is %d, I am %d\n", sock_descriptor, pthread_self());
 	if(sock_descriptor == -1){
-		printf("My sd is -1, won't disconnect\nThread is %d\n", thread);
-		if(thread != -1){
-			pthread_kill(thread, SIGINT);
+		if(thread_list != NULL){
+			signal_threads(thread_list, sigo);
 		}
+		free_thread_list(thread_list);
+		// if(thread != -1)
+		// 	pthread_kill(thread, sigo);
 		pthread_exit(&res);
 	}
-	printf("My sd is %d, closing connection...\n", sock_descriptor);
-	if(close_initiator_tcp(sock_descriptor) == -1) {
-		printf("Close error\n");
+	else if(close_initiator_tcp(sock_descriptor) == -1) {
+		fprintf(stderr, "Close error\n");
 		res = EXIT_FAILURE;
 	}
+	sock_descriptor = -1;
 	pthread_exit(&res);
 }
 
@@ -71,9 +76,9 @@ void *evadi_richiesta(void *socket_desc) {
 	init_log("_server_log_");
 
 	sock_descriptor = socket;
-	signal(SIGINT, _handler);
+	printf("I'm thread %d and my sd is %d\n", pthread_self(), sock_descriptor);
 
-	printf("I'm a thread and my sd is %d\n", sock_descriptor);
+	signal(SIGINT, _handler);
 
 	int res = recv_tcp(socket, client_request, BUFSIZ);
 	if(res < 0){
@@ -197,8 +202,8 @@ int process_manager(int list_s) {
 			printf("Errore server : impossibile creare il thread \n");
 			exit(-1);
 		}
-		thread = tid;
-		printf("Thread is %d\n", thread);
+		// thread = tid;
+		insert_thread_in_list(tid, &thread_list);
 	}
 }
 

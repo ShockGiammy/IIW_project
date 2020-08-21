@@ -12,7 +12,6 @@
 #include <sys/time.h>
 #include <limits.h>
 
-
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
 #define MSS               1500    // we define the MSS for the TCP segment as a constant value
 #define CONG_SCALING_MSS_THRESHOLD 500
@@ -33,7 +32,6 @@
 #define PROCESSES 10
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
-
 typedef struct tcp_segment
 {
   unsigned int sequence_number;
