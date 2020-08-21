@@ -48,6 +48,8 @@ void *evadi_richiesta(void *socket_desc) {
 	int socket = *(int*)socket_desc;
 	free((int*)socket_desc);
 
+	init_log("_server_log_");
+
 	int res = recv_tcp(socket, client_request, BUFSIZ);
 	if(res < 0){
 		res = 0;

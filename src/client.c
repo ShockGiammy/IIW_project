@@ -52,6 +52,9 @@ int main(int argc, char *argv[]) {
 
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
+
+	init_log("_client_log_");
+
     /*  Set the remote port  */
     port = strtol(szPort, &endptr, 0);
     if ( *endptr ) {

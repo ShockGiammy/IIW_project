@@ -22,9 +22,10 @@
 #include <net/if.h>
 #include <pthread.h>
 
-cong_struct *cong;
-static slid_win recv_win; // the sliding window for the receiver
-static slid_win sender_wind; //sliding window for the sender
+static __thread cong_struct cong;
+static __thread slid_win recv_win; // the sliding window for the receiver
+static __thread slid_win sender_wind; //sliding window for the sender
+
 int new_port = 0;
 static int fd = -1;
 char msg[LOG_MSG_SIZE] = { 0 };
@@ -497,6 +498,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	memset(data_buf, 0, MSS);
 
+	if(cong.cong_win == 0){
+		cong.state = 0;
+		cong.cong_win = MSS;
+		cong.threshold = 64000;
+		cong.support_variable = 0;
+	}
+
 	int bytes_left_to_send = size;
 	tcp send_segm[MAX_BUF_SIZE]; // keeps the segment that we send, so that we can perform resending and/or acknowledge.
 	tcp recv_segm = (const tcp) { 0 }; // used to unpack the ack and see if everything was good
@@ -509,11 +517,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 		memset(&send_segm[j], 0, sizeof(tcp));
 	
 	//sender_wind.max_size = MSS; //we accept at most BUFSIZ bytes on the fly at the same time
-	snprintf(msg, LOG_MSG_SIZE, "send_tcp\ncongWin: %d\n", cong->cong_win);
+	snprintf(msg, LOG_MSG_SIZE, "send_tcp\ncongWin: %d\n", cong.cong_win);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 
-	sender_wind.max_size = cong->cong_win < MAX_WIN-MSS ? cong->cong_win : MAX_WIN-MSS;
+	sender_wind.max_size = cong.cong_win < MAX_WIN-MSS ? cong.cong_win : MAX_WIN-MSS;
 	sender_wind.max_size = sender_wind.max_size < size ? sender_wind.max_size : size;
 
 	snprintf(msg, LOG_MSG_SIZE, "send_tcp\nmax: %d\nlast_to_ack: %d\n", sender_wind.max_size, sender_wind.last_to_ack);
@@ -552,6 +560,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: Need to send segments? -> %d > 0 && %d < %d\n", bytes_left_to_send, sender_wind.on_the_fly, sender_wind.max_size);
+		print_on_log(fd, msg);
+		memset(msg, 0, LOG_MSG_SIZE);
+
 		if((bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size)) {
 			int n_to_copy = (bytes_left_to_send > MSS)*MSS + (bytes_left_to_send <= MSS)*bytes_left_to_send;
 			memcpy(data_buf, buf, n_to_copy);
@@ -563,7 +575,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			bytes_left_to_send -= n_to_copy;
 			data_buf[n_to_copy] = 0;
 			n_read += n_to_copy;
-			buf += n_to_copy-1 ;
+			buf += n_to_copy;
 
 			if(n_to_copy >= 0) {
 				snprintf(msg, LOG_MSG_SIZE, "send_tcp\nindex: %d, max: %d\n", index, MAX_BUF_SIZE);
@@ -589,7 +601,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		gettimeofday(&start_rtt, NULL);
 
 		// we have read the max number of data, we proceed with the sending in pipelining
-		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d >= %ld || %d >= %d\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
+		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d >= %d || %d >= %ld\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 
@@ -697,8 +709,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 }
 
 int calculate_window_dimension() {
-	if (cong->cong_win < MAX_WIN) {
-		return cong->cong_win;
+	if (cong.cong_win < MAX_WIN) {
+		return cong.cong_win;
 	}
 	else {
 		return MAX_WIN;
@@ -707,12 +719,12 @@ int calculate_window_dimension() {
 
 int congestion_control_receiveAck(slid_win sender_wind) {
 
-	switch(cong->state)
+	switch(cong.state)
 	{
 		case 0:
-			cong->cong_win = cong->cong_win + MSS;
-			if (cong->cong_win > cong->threshold) {
-				cong->state = 1;
+			cong.cong_win = cong.cong_win + MSS;
+			if (cong.cong_win > cong.threshold) {
+				cong.state = 1;
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: Entered in Congestion Avoidance\n");
 				print_on_log(fd, msg);
 				memset(msg, 0, LOG_MSG_SIZE);
@@ -720,21 +732,21 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 			break;
 
 		case 1:
-			cong->support_variable = cong->support_variable + (int)floor(MSS*MSS/cong->cong_win);
+			cong.support_variable = cong.support_variable + (int)floor(MSS*MSS/cong.cong_win);
 
-			snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: support variable: %d\n", cong->support_variable);
+			snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: support variable: %d\n", cong.support_variable);
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
-			if (cong->support_variable >= CONG_SCALING_MSS_THRESHOLD) {
-				cong->cong_win = cong->cong_win + MSS;
-				cong->support_variable = 0;
+			if (cong.support_variable >= CONG_SCALING_MSS_THRESHOLD) {
+				cong.cong_win = cong.cong_win + MSS;
+				cong.support_variable = 0;
 			}
 			break;
 
 		case 2:
-			cong->cong_win = cong->threshold;
-			cong->state = 1;
+			cong.cong_win = cong.threshold;
+			cong.state = 1;
 
 			snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: Entered in Congestion Avoidance\n");
 			print_on_log(fd, msg);
@@ -746,28 +758,28 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 }
 
 int congestion_control_duplicateAck(slid_win sender_wind) {
-	switch(cong->state)
+	switch(cong.state)
 	{
 		case 0:
-			cong->state = 2;
+			cong.state = 2;
 			
 			snprintf(msg, LOG_MSG_SIZE, "congestion_control_duplicateAck: Entered in Fast Recovery\n");
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
-			cong->threshold = cong->cong_win/2;
-			cong->cong_win = cong->threshold + 3*MSS;
+			cong.threshold = cong.cong_win/2;
+			cong.cong_win = cong.threshold + 3*MSS;
 			break;
 
 		case 1:
-			cong->state = 2;
+			cong.state = 2;
 
 			snprintf(msg, LOG_MSG_SIZE, "congestion_control_duplicateAck: Entered in Fast Recovery\n");
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
-			cong->threshold = cong->cong_win/2;
-			cong->cong_win = cong->threshold + 3*MSS;
+			cong.threshold = cong.cong_win/2;
+			cong.cong_win = cong.threshold + 3*MSS;
 			break;
 
 		case 2:
@@ -778,55 +790,58 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 }
 
 int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind) {
-	if (cong->state == 2) {
-		cong->cong_win = cong->cong_win + MSS;
+	if (cong.state == 2) {
+		cong.cong_win = cong.cong_win + MSS;
 	}
 }
 
 int congestion_control_timeout(slid_win sender_wind) {
-	switch(cong->state)
+	switch(cong.state)
 	{
 		case 0:
-			cong->threshold = cong->cong_win/2;
-			cong->cong_win = MSS;
+			cong.threshold = cong.cong_win/2;
+			cong.cong_win = MSS;
 			break;
 
 		case 1:
-			cong->state = 0;
+			cong.state = 0;
 
 			snprintf(msg, LOG_MSG_SIZE, "congestion_control_timeout: Entered in Slow Start\n");
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
-			cong->threshold = cong->cong_win/2;
-			cong->cong_win = MSS;
+			cong.threshold = cong.cong_win/2;
+			cong.cong_win = MSS;
 			break;
 
 		case 2:
-			cong->state = 0;
+			cong.state = 0;
 
 			snprintf(msg, LOG_MSG_SIZE, "congestion_control_timeout: Entered in Slow Start\n");
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 
-			cong->threshold = cong->cong_win/2;
-			cong->cong_win = MSS;
+			cong.threshold = cong.cong_win/2;
+			cong.cong_win = MSS;
 			break;
 	}
 	return 0;
 }
 
 int check_size_buffer(slid_win sender_wind, int receiver_window) {
-	if (cong->cong_win < receiver_window) {
-		sender_wind.max_size = cong->cong_win;
+	if (cong.cong_win < receiver_window) {
+		sender_wind.max_size = cong.cong_win;
 	}
 	else {
 		sender_wind.max_size = receiver_window;
 	}
 
-	snprintf(msg, LOG_MSG_SIZE, "check_size_buffer\n congWin %d\nthreshold %d\nreceiver_window %d\nmax_size %d\n", cong->cong_win, cong->threshold, receiver_window, sender_wind.max_size);
+	snprintf(msg, LOG_MSG_SIZE, "check_size_buffer\n congWin %d\nthreshold %d\nreceiver_window %d\nmax_size %d\n",
+		cong.cong_win, cong.threshold, receiver_window, sender_wind.max_size);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
+
+	//printf("congwin = %d\n", cong.cong_win);
 
 	return 0;
 }
@@ -845,6 +860,10 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 	// the head for our segment linked list
 	tcp *buf_segm = NULL;
+
+	if(recv_win.last_to_ack == 0){
+		recv_win.last_to_ack = MAX_WIN-MSS;
+	}
 
 	tcp ack;
 	int list_length = 0;
@@ -892,7 +911,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		//printf("%d <= %d && %d <= %d\n", recv_win.next_to_ack, segment->sequence_number, segment->sequence_number, recv_win.last_to_ack);
 
 		// buffer segments
-		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) && ( segment->sequence_number <= recv_win.last_to_ack)) {
+		if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= segment->sequence_number) 
+			&& ( segment->sequence_number <= recv_win.last_to_ack) && (segment->data_length != 0)) {
+			
 			list_length++;
 
 			snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Buffering segment...\n");
@@ -904,7 +925,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		if(received_data){
 			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
-			recv_timeout.tv_usec = 0;
+			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
 				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SHORT_USEC\n");
 				return -1;
@@ -938,7 +959,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 				memset(recv_buf, 0, MSS+HEAD_SIZE);
 
-				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= second_segm->sequence_number) && ( second_segm->sequence_number <= recv_win.last_to_ack)) {
+				if(list_length < MAX_BUF_SIZE && (recv_win.next_to_ack <= second_segm->sequence_number) 
+					&& ( second_segm->sequence_number <= recv_win.last_to_ack) && (second_segm->data_length != 0)) {
+					
 					list_length++;
 
 					snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Buffering segment...\n");
@@ -993,7 +1016,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout));
 
 		if(received_data){
-			recv_timeout.tv_sec = 0;
+			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
 			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
 			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
 				fprintf(stderr, "recv_tcp: Error while setting options");
@@ -1091,19 +1114,6 @@ void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval
 }
 
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len){
-	
-	char log_filename[256] = {0};
-	int tid = syscall(__NR_gettid);
-	snprintf(log_filename, 256, "%d", tid);
-
-	strcat(log_filename, "_client_log_");
-	
-	time_t ltime = time(NULL);
-	strcat(log_filename, asctime(localtime(&ltime)));
-
-	strcat(log_filename, "txt");
-
-	fd = create_log_file(log_filename);
 		
 	tcp head_rcv = (const tcp) {0};
 	char recv_buf[HEAD_SIZE];
@@ -1113,10 +1123,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	memset(&head_rcv, 0, sizeof(tcp));
 	
 	memset(&recv_win, 0, sizeof(recv_win));
-	memset(&sender_wind, 0, sizeof(recv_win));
-
-	recv_win.last_to_ack = MAX_WIN-MSS;
-
+	memset(&sender_wind, 0, sizeof(sender_wind));
 
 	struct sockaddr_in server_addr;
 	bzero(&server_addr, sizeof(server_addr));
@@ -1208,11 +1215,6 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 		printf("-");
 	printf("\n");
 
-	cong = malloc(sizeof(cong_struct));
-	cong->state = 0;
-	cong->cong_win = MSS;
-	cong->threshold = 64000;
-	cong->support_variable = 0;
 	return 0;
 }
 
@@ -1220,15 +1222,11 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	char recv_buf[HEAD_SIZE];
 	memset(recv_buf, 0, HEAD_SIZE);
-	memset(&recv_win, 0, sizeof(recv_win));
-	memset(&sender_wind, 0, sizeof(recv_win));
 
 	tcp head_rcv = { 0 };
 	struct sockaddr_in client_address;
 	bzero(&client_address, sizeof(client_address));
 	struct in_addr addr_from_client;
-
-	recv_win.last_to_ack = MAX_WIN-MSS;
 
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
@@ -1240,20 +1238,6 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
 		return -1;
 	}
-	
-	// Create log file
-	char log_filename[256] = {0};
-	int tid = syscall(__NR_gettid);
-	snprintf(log_filename, 256, "%d", tid);
-
-	strcat(log_filename, "_server_log_");
-	
-	time_t ltime = time(NULL);
-	strcat(log_filename, asctime(localtime(&ltime)));
-
-	strcat(log_filename, "txt");
-
-	fd = create_log_file(log_filename);
 
 	// get client information
 	char address_string[INET_ADDRSTRLEN];
@@ -1331,12 +1315,6 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");
-	
-	cong = malloc(sizeof(cong_struct));
-	cong->state = 0;
-	cong->cong_win = MSS;
-	cong->threshold = 64000;
-	cong->support_variable = 0;
 
 	return sock_conn;
 }
@@ -1378,8 +1356,6 @@ int close_client_tcp(int sockd){
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");
-
-	free(cong);
 	
 	return res;
 }
@@ -1425,7 +1401,21 @@ void close_server_tcp(int sockd){
 		printf("-");
 	printf("\n");
 
-	free(cong);
-
 	pthread_exit(&res);
+}
+
+void init_log(char* part_filename){
+	// Create log file
+	char log_filename[256] = {0};
+	int tid = syscall(__NR_gettid);
+	snprintf(log_filename, 256, "%d", tid);
+
+	strcat(log_filename, part_filename);
+	
+	time_t ltime = time(NULL);
+	strcat(log_filename, asctime(localtime(&ltime)));
+
+	strcat(log_filename, "txt");
+
+	fd = create_log_file(log_filename);
 }
