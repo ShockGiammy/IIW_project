@@ -27,9 +27,8 @@ int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
 
 void _handler(int sigo) {
-	printf("\nChiuso \n");
-	if(close_client_tcp(conn_s) == -1) {
-		printf("Errore close \n");
+	if(close_initiator_tcp(conn_s) == -1) {
+		printf("Close error\n");
 		exit(-1);
 	}
 	exit(0);
@@ -58,14 +57,14 @@ int main(int argc, char *argv[]) {
     /*  Set the remote port  */
     port = strtol(szPort, &endptr, 0);
     if ( *endptr ) {
-		printf("client: porta non riconosciuta.\n");
+		printf("client: unknown port\n");
 		exit(EXIT_FAILURE);
     }
 
     /*  Create the listening socket  */
 
     if ((conn_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
-		fprintf(stderr, "client: errore durante la creazione della socket.\n");
+		fprintf(stderr, "client: creation socket error\n");
 		exit(EXIT_FAILURE);
     }
 
@@ -78,33 +77,33 @@ int main(int argc, char *argv[]) {
     /*  Set the remote IP address  */
 
     if ( inet_aton(szAddress, &servaddr.sin_addr) <= 0 ) {
-		printf("client: indirizzo IP non valido.\nclient: risoluzione nome...");
+		printf("client: IP address not valid.\nclient: IP addresso lookup...");
 		
 		if ((he=gethostbyname(szAddress)) == NULL) {
-			printf("fallita.\n");
+			printf("failed\n");
   			exit(EXIT_FAILURE);
 		}
-		printf("riuscita.\n\n");
+		printf("succeeded\n\n");
 		servaddr.sin_addr = *((struct in_addr *)he->h_addr_list);
     }
    	signal(SIGINT,_handler);
     /*  connect() to the remote server  */
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(servaddr.sin_family, &servaddr.sin_addr, address_string, INET_ADDRSTRLEN);
-	printf("Instauro connessione con %s\n", address_string);
+	printf("Enstablishing connection with %s\n", address_string);
     
 	socklen_t addr_len = INET_ADDRSTRLEN;
 	if ( connect_tcp(conn_s, &servaddr, addr_len ) < 0 ) {
-		printf("client: errore durante la connect.\n");
+		printf("client: connect error\n");
 		exit(EXIT_FAILURE);
     }
 
 	/* connessione */
-	printf("Inserire nome utente: ");
+	printf("Insert a username: ");
 	if(fgets(username,39,stdin) == NULL) {
-		printf("Errore fgets\n");
+		printf("fgets error\n");
 		if(close(conn_s) == -1) {
-			printf("Errore close \n");
+			printf("Close error \n");
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -116,9 +115,9 @@ int main(int argc, char *argv[]) {
 
 	do{
 		if(fgets(command,MAX_LINE-1,stdin) == NULL) {
-			printf("Errore fgets\n");
+			printf("fgets error\n");
 			if(close(conn_s) == -1) {
-				printf("Errore close \n");
+				printf("close error\n");
 				exit(-1);
 			}
 		}

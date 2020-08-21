@@ -30,9 +30,29 @@
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
 
+static __thread int sock_descriptor = -1;
+static pthread_t thread = -1;
+
 int gen_id;
 
 int ParseCmdLine(int argc, char *argv[], char **szPort);
+
+void _handler(int sigo) {
+	int res = EXIT_SUCCESS;
+	if(sock_descriptor == -1){
+		printf("My sd is -1, won't disconnect\nThread is %d\n", thread);
+		if(thread != -1){
+			pthread_kill(thread, SIGINT);
+		}
+		pthread_exit(&res);
+	}
+	printf("My sd is %d, closing connection...\n", sock_descriptor);
+	if(close_initiator_tcp(sock_descriptor) == -1) {
+		printf("Close error\n");
+		res = EXIT_FAILURE;
+	}
+	pthread_exit(&res);
+}
 
 void *evadi_richiesta(void *socket_desc) {
 
@@ -49,6 +69,11 @@ void *evadi_richiesta(void *socket_desc) {
 	free((int*)socket_desc);
 
 	init_log("_server_log_");
+
+	sock_descriptor = socket;
+	signal(SIGINT, _handler);
+
+	printf("I'm a thread and my sd is %d\n", sock_descriptor);
 
 	int res = recv_tcp(socket, client_request, BUFSIZ);
 	if(res < 0){
@@ -172,6 +197,8 @@ int process_manager(int list_s) {
 			printf("Errore server : impossibile creare il thread \n");
 			exit(-1);
 		}
+		thread = tid;
+		printf("Thread is %d\n", thread);
 	}
 }
 

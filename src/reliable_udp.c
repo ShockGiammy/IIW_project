@@ -424,7 +424,7 @@ int send_flags(int sockd, int flags){
 	memset(msg, 0, LOG_MSG_SIZE);
 
 	make_seg(segment, buf);
-	int ret = write(sockd, buf, HEAD_SIZE);
+	int ret = send_unreliable(sockd, buf, HEAD_SIZE);
 	return ret;
 }
 
@@ -899,7 +899,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		received_data = segment->data_length != 0;
 		
 		if(segment->fin && !segment->ack){
-			close_server_tcp(sockd);
+			close_receiver_tcp(sockd);
 		}
 		
 		snprintf(msg, LOG_MSG_SIZE, "recv_tcp: New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
@@ -954,7 +954,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 				memset(msg, 0, LOG_MSG_SIZE);
 
 				if(second_segm->fin && !second_segm->ack){
-					close_server_tcp(sockd);
+					close_receiver_tcp(sockd);
 				}
 
 				memset(recv_buf, 0, MSS+HEAD_SIZE);
@@ -1071,7 +1071,7 @@ int recv_tcp_segm(int sockd, tcp* dest_segm){
 	extract_segment(dest_segm, recv_buf);
 	
 	if(dest_segm->fin && !dest_segm->ack){
-		close_server_tcp(sockd);
+		close_receiver_tcp(sockd);
 	}
 
 	return n;
@@ -1319,35 +1319,39 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	return sock_conn;
 }
 
-int close_client_tcp(int sockd){
-	tcp temp = (const tcp) { 0 };
-
+int close_initiator_tcp(int sockd){
+	printf("\n");
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
-	printf("\nConnection termination\n");
+	printf("\nConnection termination on socket %d\n", sockd);
 	
-	printf("Sending Fin...\n");
-	send_flags(sockd, Fin);
+	for(int i=0; i<MAX_ATTMPTS_CLOSE; i++){
+		tcp temp = (const tcp) { 0 };
+		printf("Sending Fin...\n");
+		send_flags(sockd, Fin);
 
-	struct timeval recv_timeout;
-	recv_timeout.tv_sec = 3;
-	recv_timeout.tv_usec = 0;
-	if (setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) < 0) {
-		perror("setsockopt failed\n");
-	}
+		struct timeval recv_timeout;
+		recv_timeout.tv_sec = 3;
+		recv_timeout.tv_usec = 0;
+		if (setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) < 0) {
+			perror("setsockopt failed\n");
+			return -1;
+		}
 
-	recv_tcp_segm(sockd, &temp);
+		recv_tcp_segm(sockd, &temp);
 
-	if((temp.fin & temp.ack) == 0){
-		perror("Missing fin-ack, could not close connection...\n");
-		return -1;
-	}
+		if((temp.fin & temp.ack) == 0){
+			perror("Missing fin-ack, could not close connection...\n");
+			continue;
+		}
 
-	printf("Received Fin-Ack, sending Ack...\n");
+		printf("Received Fin-Ack, sending Ack...\n");
 
-	if ( send_flags(sockd, Ack) < 0 ){
-		perror("Failed to send ack, could not close connection...\n");
-		return -1;
+		if ( send_flags(sockd, Ack) < 0 ){
+			perror("Failed to send ack, could not close connection...\n");
+			continue;
+		}
+		break;
 	}
 
 	int res = close(sockd);
@@ -1360,7 +1364,7 @@ int close_client_tcp(int sockd){
 	return res;
 }
 
-void close_server_tcp(int sockd){
+void close_receiver_tcp(int sockd){
 	tcp temp = (const tcp) { 0 };
 	int res = -1;
 

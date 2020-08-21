@@ -23,6 +23,7 @@
 #define MAX_LINE          4096
 #define MAX_LINE_DECOR    30
 #define MAX_ATTMPTS_RETX  10
+#define MAX_ATTMPTS_CLOSE 5
 #define RECV_TIMEOUT_SEC  1 << 11
 #define RECV_TIMEOUT_SHORT_SEC 1
 #define RECV_TIMEOUT_SHORT_USEC 1 << 8
@@ -100,8 +101,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
 int recv_tcp(int sockd, void* buf, size_t size);
 int send_tcp(int sockd, void* buf, size_t size);
-int close_client_tcp(int sockd);
-void close_server_tcp(int sockd);
+int close_initiator_tcp(int sockd);
+void close_receiver_tcp(int sockd);
 int make_seg(tcp segment, char *send_segm);
 int extract_segment(tcp *segment, char *recv_segm);
 void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, unsigned long recv, bool is_ack, bool is_fin, bool is_syn);
