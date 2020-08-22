@@ -148,12 +148,13 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_char;
 
 	segment->checksum = ntohs(*recv_buf_short);
+	recv_buf_short = &segment->checksum;
 	recv_buf_short++;
 	bytes_recv += sizeof(unsigned short int);
-	printf("Here's the checksum %d\n", segment->checksum);
+	//printf("Here's the checksum %d\n", segment->checksum);
 
 	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);
-	if(recv_chsum != USHRT_MAX) {
+	if(recv_chsum != 0) {
 		printf("The segment has an error\n");
 		return -1;
 	}
@@ -193,9 +194,8 @@ unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
 	sum = (sum >>16) + (sum & 0xffff);
 	sum += (sum >>16);
 
-	printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
+	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
 	return (unsigned short int)~sum;
-	//return ~sum;
 }
 
 void concat_segm(char *segm, char *to_concat, int max) {

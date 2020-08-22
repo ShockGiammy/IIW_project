@@ -126,5 +126,6 @@ int check_size_buffer(slid_win sender_wind, int receiver_window);
 char* replace_char(char* str, char find, char replace);
 void init_log(char* part_filename);
 char *strremove(char *str, const char *sub);
+unsigned short int calc_checksum(unsigned short int*segm, unsigned int count);
 
 #endif  /*  PG_SOCK_HELP  */
