@@ -103,7 +103,6 @@ int main(int argc, char *argv[]) {
 	FD_SET(STDIN_FILENO, &set_sock_stdin);
 	FD_SET(conn_s, &set_sock_stdin);
 
-	fd_set read_set;
 	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
 
 	/* connessione */
@@ -115,7 +114,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	// might receive connecion termination from server
+	// might receive connection termination from server
 	if(FD_ISSET(conn_s, &set_sock_stdin)){
 		char recv_buf[HEAD_SIZE] = { 0 };
 		recv_tcp(conn_s, recv_buf, HEAD_SIZE);

@@ -236,10 +236,7 @@ void signal_threads(thread_list_t* list_head, int sigo){
 	thread_list_t* current = list_head;
 	while(current != NULL){
 		thread_id = current->tid;
-		if ( pthread_kill(thread_id, sigo) != 0 ){
-			perror("pthread_kill error\n");
-			return;
-		}
+		pthread_kill(thread_id, sigo);
 		current = current->next;
 	}
 }
