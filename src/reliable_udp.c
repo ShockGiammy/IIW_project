@@ -668,11 +668,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 					index++;
 					index %= MAX_BUF_SIZE;
+					gettimeofday(&start_rtt, NULL);
 				}
 			}
 
 		}
-		gettimeofday(&start_rtt, NULL);
 
 		snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d >= %d || %d >= %ld\n", sender_wind.on_the_fly, sender_wind.max_size, n_read, size);
 		print_on_log(fd, msg);
@@ -687,19 +687,17 @@ int send_tcp(int sockd, void* buf, size_t size){
 			FD_ZERO(&set_sock_recv);
 			FD_SET(sockd, &set_sock_recv);
 
-			if( select(sockd + 1, &set_sock_recv, NULL, NULL, NULL) < 0 ){
+			gettimeofday(&finish_rtt, NULL);
+			estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+
+			if( select(sockd + 1, &set_sock_recv, NULL, NULL, &(send_timeo.time)) < 0 ){
 				perror("select error\n");
 				exit(EXIT_FAILURE);
 			}
 
-			memset(recv_ack_buf, 0, HEAD_SIZE);
-			if(recv(sockd, recv_ack_buf, HEAD_SIZE, 0) > 0) { //we expect a buffer with only header and no data
-					gettimeofday(&finish_rtt, NULL);
-					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&(send_timeo.time), sizeof(send_timeo.time)) == -1) {
-						printf("Sender error setting opt(1)\n%s\n", strerror(errno));
-						return -1;
-					}
+			if(FD_ISSET(sockd, &set_sock_recv)) { //we expect a buffer with only header and no data
+					memset(recv_ack_buf, 0, HEAD_SIZE);
+					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
 					// printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 					memset(&recv_segm, 0, sizeof(recv_segm));
 					extract_segment(&recv_segm, recv_ack_buf);
@@ -734,6 +732,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 							congestion_control_duplicateAck(sender_wind);
 							check_size_buffer(sender_wind, recv_segm.receiver_window);
 							retx(send_segm, sender_wind, send_buf, sockd);
+							gettimeofday(&start_rtt, NULL);
 						}
 					}
 					else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
@@ -763,6 +762,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				congestion_control_timeout(sender_wind);
 				check_size_buffer(sender_wind, recv_segm.receiver_window);
 				retx(send_segm, sender_wind, send_buf, sockd);
+				gettimeofday(&start_rtt, NULL);
 			}
 			memset(recv_segm.data, 0, recv_segm.data_length);
 			memset(send_buf, 0, MSS+HEAD_SIZE);
@@ -986,6 +986,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		if(segment->fin && !segment->ack && !segment->syn){
 			close_receiver_tcp(sockd);
 		}
+
+		if(size == 0)
+			return 0;
 		
 		snprintf(msg, LOG_MSG_SIZE, "recv_tcp: New segment of %d bytes, seq num %d\n", segment->data_length, segment->sequence_number);
 		print_on_log(fd, msg);
@@ -1439,14 +1442,16 @@ int close_initiator_tcp(int sockd){
 		}
 
 		if((temp.fin && temp.ack) == 0 || (temp.syn)){
-			perror("Missing fin-ack, could not close connection...\n");
+			if(i == MAX_ATTMPTS_CLOSE)
+				perror("Missing fin-ack, could not close connection...\n");
 			continue;
 		}
 
 		printf("Received Fin-Ack, sending Ack...\n");
 
 		if ( send_flags(sockd, Ack) < 0 ){
-			perror("Failed to send ack, could not close connection...\n");
+			if(i == MAX_ATTMPTS_CLOSE)
+				perror("Failed to send ack, could not close connection...\n");
 			continue;
 		}
 		break;
@@ -1508,9 +1513,10 @@ void close_receiver_tcp(int sockd){
 		}
 
 		if( !temp.ack || temp.fin || temp.syn){
-			perror("Missing ack, could not close connection...\n");
-			if(i == MAX_ATTMPTS_CLOSE)
+			if(i == MAX_ATTMPTS_CLOSE){
+				perror("Missing ack, could not close connection...\n");
 				pthread_exit(&res);
+			}
 		}
 		else break;		
 	}

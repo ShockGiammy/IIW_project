@@ -125,6 +125,6 @@ int congestion_control_timeout(slid_win sender_wind);
 int check_size_buffer(slid_win sender_wind, int receiver_window);
 char* replace_char(char* str, char find, char replace);
 void init_log(char* part_filename);
-unsigned short int calc_checksum(unsigned short int *segm, unsigned int count);
+char *strremove(char *str, const char *sub);
 
 #endif  /*  PG_SOCK_HELP  */
