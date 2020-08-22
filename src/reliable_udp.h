@@ -45,6 +45,7 @@ typedef struct tcp_segment
   bool fin;
   bool ack;
 
+  unsigned short int checksum;
   //this field is usefull to keep the segments in a linked list
   struct tcp_segment *next;
 } tcp;
@@ -124,5 +125,6 @@ int congestion_control_timeout(slid_win sender_wind);
 int check_size_buffer(slid_win sender_wind, int receiver_window);
 char* replace_char(char* str, char find, char replace);
 void init_log(char* part_filename);
+unsigned short int calc_checksum(unsigned short int *segm, unsigned int count);
 
 #endif  /*  PG_SOCK_HELP  */
