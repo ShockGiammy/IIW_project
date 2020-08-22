@@ -77,11 +77,12 @@ int make_seg(tcp segment, char *send_segm) {
 	send_segm_char += segment.data_length;
 	bytes_written += segment.data_length;
 
-	send_segm_ptr = (unsigned int *)send_segm_char;
-	unsigned short int *send_segm_short = (unsigned short int *)send_segm_ptr;
+	unsigned short int *send_segm_short = (unsigned short int *)send_segm_char;
 	
 	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
 	*send_segm_short = htons(send_chsum);
+	printf("chksum: %d\nchksum in segment: %d\n", send_chsum, ntohs(*send_segm_short));
+
 	bytes_written += sizeof(unsigned short int);
 	send_segm_short++;
 
@@ -144,8 +145,7 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	char *recv_buf_char = (char *)recv_buf_ptr;
 	recv_buf_char += segment->data_length;
 
-	recv_buf_ptr = (unsigned int *)recv_buf_char;
-	unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_ptr;
+	unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_char;
 
 	segment->checksum = ntohs(*recv_buf_short);
 	recv_buf_short++;

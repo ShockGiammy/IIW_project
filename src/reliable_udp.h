@@ -15,7 +15,7 @@
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
 #define MSS               1500    // we define the MSS for the TCP segment as a constant value
 #define CONG_SCALING_MSS_THRESHOLD 500
-#define HEAD_SIZE         19
+#define HEAD_SIZE         21
 #define SOCKET_TYPE       SOCK_DGRAM
 #define MAX_WIN           MSS * 100
 #define MAX_BUF_SIZE      MAX_WIN / MSS
