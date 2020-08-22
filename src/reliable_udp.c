@@ -480,7 +480,7 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 
 	// 1/20 % of probability to lose the segment
 	if(p != 0) {
-		snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success...\n", segm_to_go);
+		snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success...\n");
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 		
