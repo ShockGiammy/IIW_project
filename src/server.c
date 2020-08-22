@@ -102,19 +102,16 @@ void *evadi_richiesta(void *socket_desc) {
 	        	send_tcp(socket, result, strlen(result));
 	    	}
 
-			int len_filename = 50;
 			while ((de = readdir(dr)) != NULL){
-    	        char string[len_filename];
-				memset(string, 0, len_filename);
-        	    strncpy(string, de->d_name, len_filename - 2);
-				string[strlen(string)] = '\n';
-	        	printf("%s", string);
+    	        char string[50];
+        	    strcpy(string, de->d_name);
+	        	printf("%s\n", string);
 			    send_tcp(socket, string, strlen(string));
     		}
 			char stop[] = "STOP";
 			send_tcp(socket, stop, strlen(stop));
 	    	closedir(dr);
-	    	printf("file listing completed\n");
+	    	printf("file listing completed \n");
 		}
 
 		else if (strcmp(client_request, "get\n") == 0) {
@@ -131,14 +128,14 @@ void *evadi_richiesta(void *socket_desc) {
 				int ret = -1;
 				pthread_exit(&ret);
 			}
-			printf("file name is %s\n", filesName);
+			printf("file name is %s \n", filesName);
 			memset(server_response, 0, BUFSIZ);
 
 			if (SendFile(socket, filesName, server_response) == 0) {
-				printf("file transfer completed\n");
+				printf("file transfer completed \n");
 			}
 			else {
-				printf("file transfer error\n");
+				printf("file transfer error \n");
 			}
 			memset(filesName, 0, BUFSIZ);
 			memset(server_response, 0, BUFSIZ);
@@ -192,13 +189,13 @@ int process_manager(int list_s) {
 		/*  Wait for a connection, then accept() it  */
 		sin_size = sizeof(struct sockaddr_in);
 		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
-		    perror("server: error while accepting client connection\n");
-	   		exit(EXIT_FAILURE);
+		    fprintf(stderr, "server: errore nella accept.\n");
+	   		exit(-1);
 		}
 		*conn = conn_s;
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
-			perror("server : cannot create thread\n");
-			exit(EXIT_FAILURE);
+			printf("Errore server : impossibile creare il thread \n");
+			exit(-1);
 		}
 		insert_thread_in_list(tid, &thread_list);
 	}
@@ -215,7 +212,7 @@ int main(int argc, char *argv[]) {
 	ParseCmdLine(argc, argv, &endptr);
 	port = strtol(endptr, &endptr, 0);
 	if ( *endptr ) { 
-	    fprintf(stderr, "server: unknown port\n");
+	    fprintf(stderr, "server: porta non riconosciuta.\n");
 	    exit(EXIT_FAILURE);
 	}
     
@@ -224,7 +221,7 @@ int main(int argc, char *argv[]) {
 	/*  Create the listening socket  */
 
     if ( (list_s = socket(PF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
-		fprintf(stderr, "server: creation socket error\n%s\n", strerror(errno));
+		fprintf(stderr, "server: errore nella creazione della socket.\n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
     }
 
@@ -232,7 +229,7 @@ int main(int argc, char *argv[]) {
 		int pid;
 		pid = fork();
 		if (pid == -1) {
-			perror("Cannot fork!\n");
+			printf("Cannot fork!\n");
 		}
 		else if (pid == 0) {
 			process_manager(list_s);
@@ -297,7 +294,7 @@ int main(int argc, char *argv[]) {
 			è leggibile: viene invocata accept() e creato un socket di connessione */
 			if (FD_ISSET(list_s, &rset)) {
 				kill(pids[process_to_wake_up], SIGUSR1);
-				//printf("signal sent\n");
+				//printf("signal sended\n");
 			}
 			process_to_wake_up = (process_to_wake_up+1)%10;
 		}

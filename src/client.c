@@ -44,11 +44,10 @@ int main(int argc, char *argv[]) {
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
+	char fname[BUFSIZ];
 	char exitBuffer[10];
 	char username[40];
 	char server_response[BUFSIZ];
-
-	memset(username, 0, sizeof(username));
 
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -135,25 +134,20 @@ int main(int argc, char *argv[]) {
 	show_menu();
 
 	do{
-		memset(&set_sock_stdin, 0, sizeof(set_sock_stdin));
-		FD_ZERO(&set_sock_stdin);
-		FD_SET(STDIN_FILENO, &set_sock_stdin);
-		FD_SET(conn_s, &set_sock_stdin);
 		if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
 			perror("select error\n");
 			exit(EXIT_FAILURE);
 		}
 
-		// might receive connection termination from server
+		// might receive connecion termination from server
 		if(FD_ISSET(conn_s, &set_sock_stdin)){
-			recv_tcp(conn_s, NULL, 0);
+			char recv_buf[HEAD_SIZE] = { 0 };
+			recv_tcp(conn_s, recv_buf, HEAD_SIZE);
 		}
 
 		if(FD_ISSET(STDIN_FILENO, &set_sock_stdin)){
-			int len_filename = 50;
-			char fname[len_filename];
-			memset(fname, 0, len_filename);
-			if(fgets(command, len_filename, stdin) == NULL) {
+
+			if(fgets(command,MAX_LINE-1,stdin) == NULL) {
 				printf("fgets error\n");
 				if(close(conn_s) == -1) {
 					printf("close error\n");
@@ -165,15 +159,13 @@ int main(int argc, char *argv[]) {
 				memset(command, 0, sizeof(char)*(strlen(command)));
 				printf("Files in the current directory : \n");
 				for(;;){
-					memset(fname, 0, len_filename);
-					recv_tcp(conn_s, fname, len_filename);
-					if(strstr(fname, "STOP") != NULL){
-						strremove(fname, "STOP");
-						printf("%s", fname);
+					memset(&fname, '\0', 50);
+					int temp = recv_tcp(conn_s, fname, 50);
+					if(strcmp(fname, "STOP") == 0){
 						printf("No more files in the directory.\n");
 						break;
 					}
-					printf("%s", fname);
+					printf("%s\n", fname);	
 				}
 			}
 
@@ -199,7 +191,7 @@ int main(int argc, char *argv[]) {
 				}
 
 				if( RetrieveFile(conn_s, fname) < 0 ){
-					//fprintf(stderr, "RetrieveFile: error...\n");
+					fprintf(stderr, "RetrieveFile: error...\n");
 				}
 				memset(fname, 0, sizeof(char)*(strlen(fname)));
 				memset(response, 0, BUFSIZ);
@@ -262,6 +254,7 @@ int main(int argc, char *argv[]) {
 				memset(command, 0, sizeof(char)*(strlen(command)));
 			}
 		}
+
 	}while(1);
 }
 
