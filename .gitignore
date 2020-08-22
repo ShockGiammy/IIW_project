@@ -4,5 +4,4 @@ src/client
 *.o
 src/server
 *.pptx
-src/LogFiles/.fuse_hidden00000ab700000058
-src/LogFiles/.fuse_hidden00000ab800000059
+.fuse_hidden*

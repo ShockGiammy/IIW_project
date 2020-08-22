@@ -27,9 +27,8 @@ int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
 
 void _handler(int sigo) {
-	printf("\nChiuso \n");
-	if(close_client_tcp(conn_s) == -1) {
-		printf("Errore close \n");
+	if(close_initiator_tcp(conn_s) == -1) {
+		printf("Close error\n");
 		exit(-1);
 	}
 	exit(0);
@@ -58,14 +57,14 @@ int main(int argc, char *argv[]) {
     /*  Set the remote port  */
     port = strtol(szPort, &endptr, 0);
     if ( *endptr ) {
-		printf("client: porta non riconosciuta.\n");
+		printf("client: unknown port\n");
 		exit(EXIT_FAILURE);
     }
 
     /*  Create the listening socket  */
 
     if ((conn_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
-		fprintf(stderr, "client: errore durante la creazione della socket.\n");
+		fprintf(stderr, "client: creation socket error\n");
 		exit(EXIT_FAILURE);
     }
 
@@ -78,33 +77,53 @@ int main(int argc, char *argv[]) {
     /*  Set the remote IP address  */
 
     if ( inet_aton(szAddress, &servaddr.sin_addr) <= 0 ) {
-		printf("client: indirizzo IP non valido.\nclient: risoluzione nome...");
+		printf("client: IP address not valid.\nclient: IP addresso lookup...");
 		
 		if ((he=gethostbyname(szAddress)) == NULL) {
-			printf("fallita.\n");
+			printf("failed\n");
   			exit(EXIT_FAILURE);
 		}
-		printf("riuscita.\n\n");
+		printf("succeeded\n\n");
 		servaddr.sin_addr = *((struct in_addr *)he->h_addr_list);
     }
    	signal(SIGINT,_handler);
     /*  connect() to the remote server  */
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(servaddr.sin_family, &servaddr.sin_addr, address_string, INET_ADDRSTRLEN);
-	printf("Instauro connessione con %s\n", address_string);
+	printf("Enstablishing connection with %s\n", address_string);
     
 	socklen_t addr_len = INET_ADDRSTRLEN;
 	if ( connect_tcp(conn_s, &servaddr, addr_len ) < 0 ) {
-		printf("client: errore durante la connect.\n");
+		printf("client: connect error\n");
 		exit(EXIT_FAILURE);
     }
 
+	fd_set set_sock_stdin = { 0 };
+	FD_ZERO(&set_sock_stdin);
+	FD_SET(STDIN_FILENO, &set_sock_stdin);
+	FD_SET(conn_s, &set_sock_stdin);
+
+	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
+
 	/* connessione */
-	printf("Inserire nome utente: ");
+	printf("Insert a username: ");
+	fflush(stdout);
+
+	if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
+		perror("select error\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// might receive connection termination from server
+	if(FD_ISSET(conn_s, &set_sock_stdin)){
+		char recv_buf[HEAD_SIZE] = { 0 };
+		recv_tcp(conn_s, recv_buf, HEAD_SIZE);
+	}
+
 	if(fgets(username,39,stdin) == NULL) {
-		printf("Errore fgets\n");
+		printf("fgets error\n");
 		if(close(conn_s) == -1) {
-			printf("Errore close \n");
+			printf("Close error \n");
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -115,112 +134,127 @@ int main(int argc, char *argv[]) {
 	show_menu();
 
 	do{
-		if(fgets(command,MAX_LINE-1,stdin) == NULL) {
-			printf("Errore fgets\n");
-			if(close(conn_s) == -1) {
-				printf("Errore close \n");
-				exit(-1);
-			}
+		if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
+			perror("select error\n");
+			exit(EXIT_FAILURE);
 		}
-		if(strcmp(command, "list\n") == 0) {
-			send_tcp(conn_s, command, strlen(command));
-			memset(command, 0, sizeof(char)*(strlen(command)));
-			printf("Files in the current directory : \n");
-			for(;;){
-				memset(&fname, '\0', 50);
-				int temp = recv_tcp(conn_s, fname, 50);
-				if(strcmp(fname, "STOP") == 0){
-					printf("No more files in the directory.\n");
-					break;
+
+		// might receive connecion termination from server
+		if(FD_ISSET(conn_s, &set_sock_stdin)){
+			char recv_buf[HEAD_SIZE] = { 0 };
+			recv_tcp(conn_s, recv_buf, HEAD_SIZE);
+		}
+
+		if(FD_ISSET(STDIN_FILENO, &set_sock_stdin)){
+
+			if(fgets(command,MAX_LINE-1,stdin) == NULL) {
+				printf("fgets error\n");
+				if(close(conn_s) == -1) {
+					printf("close error\n");
+					exit(-1);
 				}
-				printf("%s\n", fname);	
 			}
-		}
-
-		else if(strcmp(command,"get\n") == 0) {
-			char response[BUFSIZ];
-			send_tcp(conn_s, command, strlen(command));
-			memset(command, 0, sizeof(char)*(strlen(command)));
-
-			int n = recv_tcp(conn_s, response, BUFSIZ);
-			if( n < 0 || ( strcmp(response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received %s\n", response);
-				exit(EXIT_FAILURE);
+			if(strcmp(command, "list\n") == 0) {
+				send_tcp(conn_s, command, strlen(command));
+				memset(command, 0, sizeof(char)*(strlen(command)));
+				printf("Files in the current directory : \n");
+				for(;;){
+					memset(&fname, '\0', 50);
+					int temp = recv_tcp(conn_s, fname, 50);
+					if(strcmp(fname, "STOP") == 0){
+						printf("No more files in the directory.\n");
+						break;
+					}
+					printf("%s\n", fname);	
+				}
 			}
 
-			printf("Enter the name of the file you want to receive: ");
-			scanf("%s",fname);
-			getchar();	// remove newline
+			else if(strcmp(command,"get\n") == 0) {
+				char response[BUFSIZ];
+				send_tcp(conn_s, command, strlen(command));
+				memset(command, 0, sizeof(char)*(strlen(command)));
+
+				int n = recv_tcp(conn_s, response, BUFSIZ);
+				if( n < 0 || ( strcmp(response, "ready") != 0 )){
+					fprintf(stderr, "Server side error, received %s\n", response);
+					exit(EXIT_FAILURE);
+				}
+
+				printf("Enter the name of the file you want to receive: ");
+				scanf("%s",fname);
+				getchar();	// remove newline
+				
+				n = send_tcp(conn_s, fname, strlen(fname));
+				if( n < 0 ){
+					perror("Send error...\n");
+					exit(EXIT_FAILURE);
+				}
+
+				if( RetrieveFile(conn_s, fname) < 0 ){
+					fprintf(stderr, "RetrieveFile: error...\n");
+				}
+				memset(fname, 0, sizeof(char)*(strlen(fname)));
+				memset(response, 0, BUFSIZ);
+			}
+
+			else if(strcmp(command,"put\n") == 0){
+				char bufferFile[BUFSIZ];
+
+				int n = send_tcp(conn_s, command, strlen(command));
+				if( n < 0 ){
+					perror("Could not send command...\n");
+					exit(EXIT_FAILURE);
+				}
+
+				memset(command, 0, sizeof(char)*(strlen(command)));
+
+				n = recv_tcp(conn_s, server_response, BUFSIZ);
+				if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
+					fprintf(stderr, "Server side error, received: %s\n", server_response);
+					exit(EXIT_FAILURE);
+				}
+
+				memset(server_response, 0, BUFSIZ);
+				
+				printf("Enter the name of the file you want to update: ");
+				scanf("%s",fname);
+				getchar();	// remove newline
+				
+				n = send_tcp(conn_s, fname, strlen(fname));
+				if( n < 0 ){
+					perror("Could not send filename...\n");
+					exit(EXIT_FAILURE);
+				}
+
+				n = recv_tcp(conn_s, server_response, BUFSIZ);
+				if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
+					fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
+					exit(EXIT_FAILURE);
+				}
+
+				if (SendFile(conn_s, fname, bufferFile) == 0) {
+					printf("file transfer completed \n");
+				}
+				else {
+					printf("file transfer error \n");
+					char error[] = "ERROR";
+					send_tcp(conn_s, error, strlen(error));
+				}
+				memset(fname, 0, sizeof(char)*(strlen(fname)+1));
+				memset(server_response, 0, BUFSIZ);
+			}
 			
-			n = send_tcp(conn_s, fname, strlen(fname));
-			if( n < 0 ){
-				perror("Send error...\n");
-				exit(EXIT_FAILURE);
+			else if(strcmp(command,"help\n") == 0){
+				memset(command, 0, sizeof(char)*(strlen(command)));
+				show_menu();
 			}
 
-			if( RetrieveFile(conn_s, fname) < 0 ){
-				fprintf(stderr, "RetrieveFile: error...\n");
-			}
-			memset(fname, 0, sizeof(char)*(strlen(fname)));
-			memset(response, 0, BUFSIZ);
-		}
-
-		else if(strcmp(command,"put\n") == 0){
-			char bufferFile[BUFSIZ];
-
-			int n = send_tcp(conn_s, command, strlen(command));
-			if( n < 0 ){
-				perror("Could not send command...\n");
-				exit(EXIT_FAILURE);
-			}
-
-			memset(command, 0, sizeof(char)*(strlen(command)));
-
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received: %s\n", server_response);
-				exit(EXIT_FAILURE);
-			}
-
-			memset(server_response, 0, BUFSIZ);
-			
-			printf("Enter the name of the file you want to update: ");
-			scanf("%s",fname);
-			getchar();	// remove newline
-			
-			n = send_tcp(conn_s, fname, strlen(fname));
-			if( n < 0 ){
-				perror("Could not send filename...\n");
-				exit(EXIT_FAILURE);
-			}
-
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-				fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
-				exit(EXIT_FAILURE);
-			}
-
-			if (SendFile(conn_s, fname, bufferFile) == 0) {
-				printf("file transfer completed \n");
-			}
 			else {
-				printf("file transfer error \n");
-				char error[] = "ERROR";
-				send_tcp(conn_s, error, strlen(error));
+				printf("Command not valid\n");
+				memset(command, 0, sizeof(char)*(strlen(command)));
 			}
-			memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			memset(server_response, 0, BUFSIZ);
-		}
-		
-		else if(strcmp(command,"help\n") == 0){
-			memset(command, 0, sizeof(char)*(strlen(command)));
-			show_menu();
 		}
 
-		else {
-			printf("Command not valid\n");
-			memset(command, 0, sizeof(char)*(strlen(command)));
-		}
 	}while(1);
 }
 
