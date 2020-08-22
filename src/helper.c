@@ -83,17 +83,18 @@ int RetrieveFile(int socket_desc, char* fname) {
 
 	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
 	if (fd == -1) {
-		printf("error to create file");
+		perror("Unable to create file\n");
 		return -1;
 	}
 
 	recv_tcp(socket_desc, buffer, 3);
 	printf("Received: %s\n", buffer);
 	if(strcmp(buffer, "ERR") == 0) {
+		printf("Cannot retrieve file...\n");
 		if (remove(fname) == 0) 
-      		printf("Deleted successfully\n"); 
+      		printf("Deleted created file successfully\n"); 
    		else
-      		printf("Unable to delete the file\n"); 
+      		perror("Unable to delete the file\n"); 
 		return -1;
 	}
 
@@ -239,4 +240,17 @@ void signal_threads(thread_list_t* list_head, int sigo){
 		pthread_kill(thread_id, sigo);
 		current = current->next;
 	}
+}
+
+char *strremove(char *str, const char *sub) {
+    char *p, *q, *r;
+    if ((q = r = strstr(str, sub)) != NULL) {
+        size_t len = strlen(sub);
+        while ((r = strstr(p = r + len, sub)) != NULL) {
+            memmove(q, p, r - p);
+            q += r - p;
+        }
+        memmove(q, p, strlen(p) + 1);
+    }
+    return str;
 }
