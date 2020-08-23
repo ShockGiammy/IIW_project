@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	username[strlen(username)-1] = '\0';
 	send_tcp(conn_s, username, strlen(username));
 
 	printf("Welcome to the server, %s\n", username);
@@ -160,7 +161,8 @@ int main(int argc, char *argv[]) {
 					exit(-1);
 				}
 			}
-			if(strcmp(command, "list\n") == 0) {
+			command[strlen(command)-1] = '\0';
+			if(strcmp(command, "list") == 0) {
 				send_tcp(conn_s, command, strlen(command));
 				memset(command, 0, sizeof(char)*(strlen(command)));
 				printf("Files in the current directory : \n");
@@ -177,7 +179,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			else if(strcmp(command,"get\n") == 0) {
+			else if(strcmp(command,"get") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
 				memset(command, 0, sizeof(char)*(strlen(command)));
@@ -205,7 +207,7 @@ int main(int argc, char *argv[]) {
 				memset(response, 0, BUFSIZ);
 			}
 
-			else if(strcmp(command,"put\n") == 0){
+			else if(strcmp(command,"put") == 0){
 				char bufferFile[BUFSIZ];
 
 				int n = send_tcp(conn_s, command, strlen(command));
@@ -252,7 +254,7 @@ int main(int argc, char *argv[]) {
 				memset(server_response, 0, BUFSIZ);
 			}
 			
-			else if(strcmp(command,"help\n") == 0){
+			else if(strcmp(command,"help") == 0){
 				memset(command, 0, sizeof(char)*(strlen(command)));
 				show_menu();
 			}
