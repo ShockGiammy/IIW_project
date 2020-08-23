@@ -73,8 +73,21 @@ int make_seg(tcp segment, char *send_segm) {
 	bytes_written += sizeof(unsigned int);
 
 	memcpy(send_segm_ptr, segment.data, segment.data_length);
+	char *send_segm_char = (char *)send_segm_ptr;
+	send_segm_char += segment.data_length;
 	bytes_written += segment.data_length;
 
+	unsigned short int *send_segm_short = (unsigned short int *)send_segm_char;
+	
+	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
+	*send_segm_short = htons(send_chsum);
+	printf("chksum: %d\nchksum in segment: %d\n", send_chsum, ntohs(*send_segm_short));
+
+	bytes_written += sizeof(unsigned short int);
+	send_segm_short++;
+
+	// to see if we correctly added our checksum to the segment
+	calc_checksum((unsigned short int *)send_segm, bytes_written);
 
 	snprintf(msg, LOG_MSG_SIZE, "make_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\nbytes written on send_buf: %d\n", segment.sequence_number, segment.ack_number, segment.ack, segment.syn, segment.fin, segment.data_length, bytes_written);
 	print_on_log(fd, msg);
@@ -84,6 +97,8 @@ int make_seg(tcp segment, char *send_segm) {
 }
 
 int extract_segment(tcp *segment, char *recv_segm) {
+
+	int bytes_recv = 0; // usefull to calculate the chsum
 	memset(segment, 0, sizeof(*segment));
 	memset(&(segment->data), 0, MSS);
 
@@ -91,35 +106,60 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	unsigned int* recv_buf_ptr = (unsigned int*) recv_segm;
 	segment->sequence_number = ntohl(*recv_buf_ptr);
 	recv_buf_ptr++;
+	bytes_recv += sizeof(unsigned int);
 	
 	// deserialize ack number
 	segment->ack_number = ntohl(*recv_buf_ptr);
 	recv_buf_ptr++;
-	
+	bytes_recv += sizeof(unsigned int);
+
 	// deserialize flags
 	bool* recv_buf_ptr_flag = (bool*) recv_buf_ptr;
 
 	segment->ack = *recv_buf_ptr_flag;
 	recv_buf_ptr_flag++;
+	bytes_recv += sizeof(bool);
 
 	segment->syn = *recv_buf_ptr_flag;
 	recv_buf_ptr_flag++;
+	bytes_recv += sizeof(bool);
 
 	segment->fin = *recv_buf_ptr_flag;
 	recv_buf_ptr_flag++;
+	bytes_recv += sizeof(bool);
 
 	// deserialize rcvwnd
 	recv_buf_ptr = (unsigned int*) recv_buf_ptr_flag;
 	segment->receiver_window = ntohl(*recv_buf_ptr);
 	recv_buf_ptr++;
+	bytes_recv += sizeof(unsigned int);
 
 	// deserialize data field length
 	segment->data_length = ntohl(*recv_buf_ptr);
 	recv_buf_ptr++;
+	bytes_recv += sizeof(unsigned int);
 
 	memcpy(segment->data, (char*)recv_buf_ptr, segment->data_length);
+	bytes_recv += segment->data_length;
 
-	snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length);
+	char *recv_buf_char = (char *)recv_buf_ptr;
+	recv_buf_char += segment->data_length;
+
+	unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_char;
+
+	segment->checksum = ntohs(*recv_buf_short);
+	recv_buf_short = &segment->checksum;
+	recv_buf_short++;
+	bytes_recv += sizeof(unsigned short int);
+	//printf("Here's the checksum %d\n", segment->checksum);
+
+	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);
+	if(recv_chsum != 0) {
+		printf("The segment has an error\n");
+		return -1;
+	}
+
+	snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n, checksum : %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length, segment->checksum);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 
@@ -134,6 +174,28 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 	segment->ack = is_ack;
 	segment->fin = is_fin;
 	segment->syn = is_syn;
+}
+
+unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
+	printf("Calcolo il chsum per %d bytes \n", count);
+	register long sum = 0;
+	
+	while(count > 1) {
+		sum += *segm++;
+		count -= 2;
+	}
+	
+	// add left-over byte if any
+	if (count > 0) {
+		sum += *(unsigned char *)segm;
+	}
+	
+	// fold 32-bit sum in 16-bit
+	sum = (sum >>16) + (sum & 0xffff);
+	sum += (sum >>16);
+
+	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
+	return (unsigned short int)~sum;
 }
 
 void concat_segm(char *segm, char *to_concat, int max) {

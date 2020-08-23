@@ -15,7 +15,7 @@
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
 #define MSS               1500    // we define the MSS for the TCP segment as a constant value
 #define CONG_SCALING_MSS_THRESHOLD 500
-#define HEAD_SIZE         19
+#define HEAD_SIZE         21
 #define SOCKET_TYPE       SOCK_DGRAM
 #define MAX_WIN           MSS * 100
 #define MAX_BUF_SIZE      MAX_WIN / MSS
@@ -45,6 +45,7 @@ typedef struct tcp_segment
   bool fin;
   bool ack;
 
+  unsigned short int checksum;
   //this field is usefull to keep the segments in a linked list
   struct tcp_segment *next;
 } tcp;
@@ -125,5 +126,6 @@ int check_size_buffer(slid_win sender_wind, int receiver_window);
 char* replace_char(char* str, char find, char replace);
 void init_log(char* part_filename);
 char *strremove(char *str, const char *sub);
+unsigned short int calc_checksum(unsigned short int*segm, unsigned int count);
 
 #endif  /*  PG_SOCK_HELP  */
