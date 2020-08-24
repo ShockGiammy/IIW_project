@@ -81,7 +81,7 @@ int make_seg(tcp segment, char *send_segm) {
 	
 	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
 	*send_segm_short = htons(send_chsum);
-	printf("chksum: %d\nchksum in segment: %d\n", send_chsum, ntohs(*send_segm_short));
+	//printf("chksum: %d\nchksum in segment: %d\n", send_chsum, *send_segm_short);
 
 	bytes_written += sizeof(unsigned short int);
 	send_segm_short++;
@@ -149,7 +149,7 @@ int extract_segment(tcp *segment, char *recv_segm) {
 
 	segment->checksum = ntohs(*recv_buf_short);
 	recv_buf_short = &segment->checksum;
-	recv_buf_short++;
+	//recv_buf_short++;
 	bytes_recv += sizeof(unsigned short int);
 	//printf("Here's the checksum %d\n", segment->checksum);
 
@@ -158,6 +158,7 @@ int extract_segment(tcp *segment, char *recv_segm) {
 		printf("The segment has an error\n");
 		return -1;
 	}
+	recv_buf_short++;
 
 	snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n, checksum : %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length, segment->checksum);
 	print_on_log(fd, msg);
@@ -177,7 +178,7 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 }
 
 unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
-	printf("Calcolo il chsum per %d bytes \n", count);
+	//printf("Calcolo il chsum per %d bytes \n", count);
 	register long sum = 0;
 	
 	while(count > 1) {

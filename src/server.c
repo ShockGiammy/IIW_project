@@ -89,7 +89,7 @@ void *evadi_richiesta(void *socket_desc) {
 		printf("Waiting client request...\n");
 		recv_tcp(socket, client_request, BUFSIZ);
 		
-		if (strcmp(client_request, "list\n") == 0) {
+		if (strcmp(client_request, "list") == 0) {
 			printf("command LIST entered\n");
 			fflush(stdout);
 			
@@ -117,7 +117,7 @@ void *evadi_richiesta(void *socket_desc) {
 	    	printf("file listing completed\n");
 		}
 
-		else if (strcmp(client_request, "get\n") == 0) {
+		else if (strcmp(client_request, "get") == 0) {
 			printf("command GET entered\n");
 			fflush(stdout);
 			memset(filesName, 0, BUFSIZ);
@@ -144,7 +144,7 @@ void *evadi_richiesta(void *socket_desc) {
 			memset(server_response, 0, BUFSIZ);
 		}
 
-		else if (strcmp(client_request, "put\n") == 0) {
+		else if (strcmp(client_request, "put") == 0) {
 			char* resp;
 			printf("command PUT entered\n");
 			fflush(stdout);
