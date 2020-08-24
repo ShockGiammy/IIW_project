@@ -154,15 +154,14 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	//printf("Here's the checksum %d\n", segment->checksum);
 
 	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);
+	snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\nchecksum (calculated on %d bytes) : %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length, bytes_recv,recv_chsum);
+	print_on_log(fd, msg);
+	memset(msg, 0, LOG_MSG_SIZE);
 	if(recv_chsum != 0) {
 		printf("The segment has an error\n");
 		return -1;
 	}
 	recv_buf_short++;
-
-	snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n, checksum : %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length, segment->checksum);
-	print_on_log(fd, msg);
-	memset(msg, 0, LOG_MSG_SIZE);
 
 	return segment->data_length;
 }
@@ -574,6 +573,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	int times_retx = 0;
 	sender_wind.on_the_fly = 0;
 	sender_wind.bytes_acked_current_transmission = 0;
+	int ret = 0;
 		
 	for(int j=0; j < MAX_BUF_SIZE-1; j++)
 		memset(&send_segm[j], 0, sizeof(tcp));
@@ -701,56 +701,56 @@ int send_tcp(int sockd, void* buf, size_t size){
 					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
 					// printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 					memset(&recv_segm, 0, sizeof(recv_segm));
-					extract_segment(&recv_segm, recv_ack_buf);
-					memset(recv_ack_buf, 0, HEAD_SIZE);
+					ret = extract_segment(&recv_segm, recv_ack_buf);
+						memset(recv_ack_buf, 0, HEAD_SIZE);
 
-					if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
-						close_receiver_tcp(sockd);
-					}
+						if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
+							close_receiver_tcp(sockd);
+						}
 
-					snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
-							sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
-					print_on_log(fd, msg);
-					memset(msg, 0, LOG_MSG_SIZE);
-
-					if(recv_segm.ack_number == sender_wind.next_to_ack) {
-						snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
+						snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
+								sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
 						print_on_log(fd, msg);
 						memset(msg, 0, LOG_MSG_SIZE);
 
-						sender_wind.dupl_ack++; // we increment the number of duplicate acks received
-						congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
-						check_size_buffer(sender_wind, recv_segm.receiver_window);
-
-						//fast retransmission
-						if(sender_wind.dupl_ack == 3) {
-							times_retx++;
-
-							snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
+						if(recv_segm.ack_number == sender_wind.next_to_ack) {
+							snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
 							print_on_log(fd, msg);
 							memset(msg, 0, LOG_MSG_SIZE);
 
-							congestion_control_duplicateAck(sender_wind);
+							sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+							congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
 							check_size_buffer(sender_wind, recv_segm.receiver_window);
-							retx(send_segm, sender_wind, send_buf, sockd);
-							gettimeofday(&start_rtt, NULL);
-						}
-					}
-					else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
-						// printf("Ack OK. Sliding the window...\n");
-						int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
-						if(bytes_acked < 0){
-							fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
-							return -1;
-						}
-						sender_wind.bytes_acked_current_transmission += bytes_acked;
-						congestion_control_receiveAck(sender_wind);
-						check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-						slide_window(&sender_wind, &recv_segm, send_segm);
+						//fast retransmission
+							if(sender_wind.dupl_ack == 3) {
+								times_retx++;
 
-						times_retx = 0;
-					}
+								snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
+								print_on_log(fd, msg);
+								memset(msg, 0, LOG_MSG_SIZE);
+
+								congestion_control_duplicateAck(sender_wind);
+								check_size_buffer(sender_wind, recv_segm.receiver_window);
+								retx(send_segm, sender_wind, send_buf, sockd);
+								gettimeofday(&start_rtt, NULL);
+							}
+						}
+						else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
+							// printf("Ack OK. Sliding the window...\n");
+							int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
+							if(bytes_acked < 0){
+								fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
+								return -1;
+							}
+							sender_wind.bytes_acked_current_transmission += bytes_acked;
+							congestion_control_receiveAck(sender_wind);
+							check_size_buffer(sender_wind, recv_segm.receiver_window);
+
+							slide_window(&sender_wind, &recv_segm, send_segm);
+
+							times_retx = 0;
+						}
 			}
 			// we have to retx the last segment not acked due to TO
 			else {
