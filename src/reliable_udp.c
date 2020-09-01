@@ -81,13 +81,13 @@ int make_seg(tcp segment, char *send_segm) {
 	
 	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
 	*send_segm_short = htons(send_chsum);
-	//printf("chksum: %d\nchksum in segment: %d\n", send_chsum, *send_segm_short);
+	//printf("chksum: %d\n", send_chsum);
 
 	bytes_written += sizeof(unsigned short int);
 	send_segm_short++;
 
 	// to see if we correctly added our checksum to the segment
-	calc_checksum((unsigned short int *)send_segm, bytes_written);
+	//calc_checksum((unsigned short int *)send_segm, bytes_written);
 
 	snprintf(msg, LOG_MSG_SIZE, "make_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\nbytes written on send_buf: %d\n", segment.sequence_number, segment.ack_number, segment.ack, segment.syn, segment.fin, segment.data_length, bytes_written);
 	print_on_log(fd, msg);
@@ -149,10 +149,8 @@ int extract_segment(tcp *segment, char *recv_segm) {
 
 	segment->checksum = ntohs(*recv_buf_short);
 	recv_buf_short = &segment->checksum;
-	//recv_buf_short++;
 	bytes_recv += sizeof(unsigned short int);
-	//printf("Here's the checksum %d\n", segment->checksum);
-
+	//printf("Received checksum %d\n", segment->checksum);
 	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);
 	if(recv_chsum != 0) {
 		printf("The segment has an error\n");
@@ -183,7 +181,8 @@ unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
 	
 	while(count > 1) {
 		sum += *segm++;
-		count -= 2;
+		count -= sizeof(unsigned short);
+		//segm++;
 	}
 	
 	// add left-over byte if any
@@ -192,11 +191,13 @@ unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
 	}
 	
 	// fold 32-bit sum in 16-bit
-	sum = (sum >>16) + (sum & 0xffff);
-	sum += (sum >>16);
+	while (sum >> 16) {
+		sum = (sum & 0xffff) + (sum >>16);
+	//sum += (sum >>16);
+	}
 
 	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
-	return (unsigned short int)~sum;
+	return (unsigned short)(~sum);
 }
 
 void concat_segm(char *segm, char *to_concat, int max) {

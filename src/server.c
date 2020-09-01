@@ -28,6 +28,8 @@
 #include "helper.h"           /*  our own helper functions  */
 #include "manage_client.h"
 
+char *path = "server_files";
+
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
 
@@ -95,7 +97,7 @@ void *evadi_richiesta(void *socket_desc) {
 			
 			struct dirent *de;
 
-			DIR *dr = opendir("DirectoryFiles");
+			DIR *dr = opendir(path);
 		    if (dr == NULL) {
 	    		char result[] = "Could not open current directory\n";
 		    	printf("%s\n", result);
@@ -134,7 +136,7 @@ void *evadi_richiesta(void *socket_desc) {
 			printf("file name is %s\n", filesName);
 			memset(server_response, 0, BUFSIZ);
 
-			if (SendFile(socket, filesName, server_response) == 0) {
+			if (SendFile(socket, filesName, server_response, path) == 0) {
 				printf("file transfer completed\n");
 			}
 			else {
@@ -158,7 +160,7 @@ void *evadi_richiesta(void *socket_desc) {
 			resp = "rcvd fn";
 			send_tcp(socket, resp, strlen(resp)+1);
 
-			if(RetrieveFile(socket, filesName) < 0){
+			if(RetrieveFile(socket, filesName, path) < 0){
 				fprintf(stderr, "RetrieveFile: error...\n");
 			}
 		}
