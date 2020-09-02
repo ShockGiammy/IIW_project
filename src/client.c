@@ -22,6 +22,7 @@
 
 char cmd[10];
 long conn_s;                /*  connection socket         */
+char *path = "client_files";
 
 int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
@@ -200,7 +201,7 @@ int main(int argc, char *argv[]) {
 					exit(EXIT_FAILURE);
 				}
 
-				if( RetrieveFile(conn_s, fname) < 0 ){
+				if( RetrieveFile(conn_s, fname, path) < 0 ){
 					//fprintf(stderr, "RetrieveFile: error...\n");
 				}
 				memset(fname, 0, sizeof(char)*(strlen(fname)));
@@ -242,7 +243,7 @@ int main(int argc, char *argv[]) {
 					exit(EXIT_FAILURE);
 				}
 
-				if (SendFile(conn_s, fname, bufferFile) == 0) {
+				if (SendFile(conn_s, fname, bufferFile, path) == 0) {
 					printf("file transfer completed \n");
 				}
 				else {

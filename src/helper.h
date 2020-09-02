@@ -22,8 +22,8 @@ typedef struct thread_list {
 
 /*  Function declarations  */
 
-int SendFile(int socket_desc, char* file_name, char *server_response);
-int RetrieveFile(int socket_desc, char* fname);
+int SendFile(int socket_desc, char* file_name, char *server_response, char *directory_path);
+int RetrieveFile(int socket_desc, char* fname, char *directory_path);
 int create_log_file(char *file_name);
 int print_on_log(int log_fd, char *msg);
 void signal_threads(thread_list_t* list_head, int sigo);

@@ -23,7 +23,7 @@
 #define MAX_LINE  4096
 static __thread pthread_t thread_id = -1;
 
-int SendFile(int socket_desc, char* file_name, char* response) {
+int SendFile(int socket_desc, char* file_name, char* response, char *directory_path) {
 
 	int first_byte = 0;
 	struct stat	file_stat;
@@ -33,8 +33,12 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 
 	printf("opening file\n");
 	memset(buffer, 0, BUFSIZE);
-	char path[100] = "DirectoryFiles/";
-	strcat(path, file_name);
+	
+	char path[100];
+	strncpy(path, directory_path, strlen(directory_path));
+	strcat(path, "/");
+	strncat(path, file_name, strlen(file_name));
+
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
 		printf("Error: file not found\n");
@@ -77,12 +81,19 @@ int SendFile(int socket_desc, char* file_name, char* response) {
 	return 0;
 }
 
-int RetrieveFile(int socket_desc, char* fname) {
+int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	char buffer[BUFSIZE];
 	memset(buffer, 0, BUFSIZE);
 
-	int fd = open(fname, O_WRONLY|O_CREAT, S_IRWXU);
+	char path[100];
+	strcpy(path, directory_path);
+	strcat(path, "/");
+	strcat(path, fname);
+
+	//int fd = open(path, O_WRONLY|O_CREAT, S_IRWXU);
+	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
+		printf("%d\n", errno);
 		perror("Unable to create file\n");
 		return -1;
 	}
