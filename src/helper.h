@@ -13,7 +13,7 @@
 #include <pthread.h>
 
 #define BUFSIZE	  159000
-#define LOG_MSG_SIZE 1024
+#define LOG_MSG_SIZE 1600
 
 typedef struct thread_list {
   pthread_t tid;
@@ -29,3 +29,4 @@ int print_on_log(int log_fd, char *msg);
 void signal_threads(thread_list_t* list_head, int sigo);
 int insert_thread_in_list(pthread_t tid, thread_list_t** head);
 void free_thread_list(thread_list_t* head);
+void check_args(int argc, char *argv[], int start);

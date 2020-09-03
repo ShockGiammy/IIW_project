@@ -30,6 +30,17 @@ int new_port = 0;
 static int fd = -1;
 char msg[LOG_MSG_SIZE] = { 0 };
 
+static int loss_prob; // loss probability
+static int prob_pool; // we keep there the max int we will use to generate random numbers to fake packet loss
+static long win_size; // the size of the sending window
+
+void set_params(int loss, int pool, long w_size) {
+	loss_prob = loss;
+	prob_pool = pool;
+	win_size = w_size;
+}
+
+
 int make_seg(tcp segment, char *send_segm) {
 
 	int bytes_written = 0;
@@ -175,14 +186,14 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 	segment->syn = is_syn;
 }
 
-unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
+unsigned short int calc_checksum(unsigned short*segm, unsigned int count) {
 	//printf("Calcolo il chsum per %d bytes \n", count);
-	register long sum = 0;
+	register unsigned long sum = 0;
 	
 	while(count > 1) {
-		sum += *segm++;
+		sum += *segm;
 		count -= sizeof(unsigned short);
-		//segm++;
+		segm++;
 	}
 	
 	// add left-over byte if any
@@ -193,7 +204,7 @@ unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
 	// fold 32-bit sum in 16-bit
 	while (sum >> 16) {
 		sum = (sum & 0xffff) + (sum >>16);
-	//sum += (sum >>16);
+		sum += (sum >>16);
 	}
 
 	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
@@ -480,7 +491,7 @@ int send_flags(int sockd, int flags){
 	fin = CHECK_BIT(flags, 2);
 	
 	memset(&segment, 0, sizeof(segment));
-	fill_struct(&segment,0, 0, MAX_WIN, ack, fin, syn);
+	fill_struct(&segment,0, 0, win_size, ack, fin, syn);
 
 	snprintf(msg, LOG_MSG_SIZE, "send_flags\nASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
 	print_on_log(fd, msg);
@@ -540,10 +551,10 @@ void free_segms_in_buff(tcp ** head, int n_free) {
 
 // this function will act a situation in which it is possible to lost segments or acks
 int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
-	int p = rand() % 20;
+	int p = rand() % prob_pool;
 
 	// 1/20 % of probability to lose the segment
-	if(p != 0) {
+	if(p >= loss_prob) {
 		snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success...\n");
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
@@ -584,7 +595,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 
-	sender_wind.max_size = cong.cong_win < MAX_WIN-MSS ? cong.cong_win : MAX_WIN-MSS;
+	sender_wind.max_size = cong.cong_win < win_size-MSS ? cong.cong_win : win_size-MSS;
 	sender_wind.max_size = sender_wind.max_size < size ? sender_wind.max_size : size;
 
 	snprintf(msg, LOG_MSG_SIZE, "send_tcp\nmax: %d\nlast_to_ack: %d\n", sender_wind.max_size, sender_wind.last_to_ack);
@@ -796,11 +807,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 }
 
 int calculate_window_dimension() {
-	if (cong.cong_win < MAX_WIN) {
+	if (cong.cong_win < win_size) {
 		return cong.cong_win;
 	}
 	else {
-		return MAX_WIN;
+		return win_size;
 	}
 }
 
@@ -949,7 +960,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	tcp *buf_segm = NULL;
 
 	if(recv_win.last_to_ack == 0){
-		recv_win.last_to_ack = MAX_WIN-MSS;
+		recv_win.last_to_ack = win_size-MSS;
 	}
 
 	tcp ack;
@@ -1263,7 +1274,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 
 	memset(&segment, 0, sizeof(segment));
 
-	fill_struct(&segment,0, 0, MAX_WIN, 0, 0, 1);
+	fill_struct(&segment,0, 0, win_size, 0, 0, 1);
 
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
 	

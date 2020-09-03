@@ -11,7 +11,6 @@
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include <sys/syscall.h>
-
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,9 +23,11 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <netinet/tcp.h>
+#include <math.h>
 #include "reliable_udp.h"
 #include "helper.h"           /*  our own helper functions  */
 #include "manage_client.h"
+
 
 char *path = "server_files";
 
@@ -209,17 +210,19 @@ int process_manager(int list_s) {
 int main(int argc, char *argv[]) {
 	
 	char     *endptr;                /*  for strtol()              */   
-    short int port;                  /*  port number               */
+    short int port = 2000;                  /*  port number, fixed               */
 	int       list_s;                /*  listening socket          */
 	/*  Get command line arguments  */
 	pid_t pids[PROCESSES];
 	
-	ParseCmdLine(argc, argv, &endptr);
+	/*ParseCmdLine(argc, argv, &endptr);
 	port = strtol(endptr, &endptr, 0);
 	if ( *endptr ) { 
 	    fprintf(stderr, "server: unknown port\n");
 	    exit(EXIT_FAILURE);
-	}
+	}*/
+
+	check_args(argc, argv, 1);
     
 	printf("Server in ascolto sulla porta %d\n\n\n",port);
 	
