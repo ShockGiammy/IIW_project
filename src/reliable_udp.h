@@ -12,13 +12,14 @@
 #include <sys/time.h>
 #include <limits.h>
 
+
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
 #define MSS               1500    // we define the MSS for the TCP segment as a constant value
 #define CONG_SCALING_MSS_THRESHOLD 500
 #define HEAD_SIZE         21
 #define SOCKET_TYPE       SOCK_DGRAM
-#define MAX_WIN           MSS * 100
-#define MAX_BUF_SIZE      MAX_WIN / MSS
+//#define MAX_WIN           MSS * 100
+#define MAX_BUF_SIZE      100
 #define MAX_LINE          4096
 #define MAX_LINE_DECOR    30
 #define MAX_ATTMPTS_RETX  10
@@ -95,6 +96,7 @@ enum flags {
 #ifndef PG_SOCK_HELP
 #define PG_SOCK_HELP
 
+
 /*  Function declarations  */
 int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_len);
 int accept_tcp(int socket_descriptor, struct sockaddr* addr, socklen_t* addr_len);
@@ -126,6 +128,8 @@ int check_size_buffer(slid_win sender_wind, int receiver_window);
 char* replace_char(char* str, char find, char replace);
 void init_log(char* part_filename);
 char *strremove(char *str, const char *sub);
-unsigned short int calc_checksum(unsigned short int*segm, unsigned int count);
+unsigned short int calc_checksum(unsigned short*segm, unsigned int count);
 
+
+void set_params(int loss, int pool, long w_size);
 #endif  /*  PG_SOCK_HELP  */

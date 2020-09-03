@@ -265,3 +265,43 @@ char *strremove(char *str, const char *sub) {
     }
     return str;
 }
+
+void check_args(int argc, char *argv[], int start) {
+	if(argc < 3) {
+		printf("Sintassi : ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	float prob;
+	if((prob = strtof(argv[start], NULL)) == 0) {
+		printf("Invalid loss probability\n");
+		exit(EXIT_FAILURE);
+	}
+	else if(prob == 1) {
+		printf("Loss prob = 1, the software will not be that trivial :D \n");
+		exit(EXIT_FAILURE);
+	}
+
+	// we scale our float to see which will be the range
+	int n_digit = 0;
+	while((prob/10) < 1) {
+		prob = prob*10;
+		n_digit++;
+	}
+
+	int prob_pool = 1;
+	// we compute the power of the probability pool
+	while(n_digit > 0) {
+		prob_pool = prob_pool*10;
+		n_digit--; 
+	}
+
+	long win_size;
+	if((win_size = strtol(argv[start+1], NULL, 10)) == 0) {
+		printf("Invalid window size\n");
+		exit(EXIT_FAILURE);
+	}
+
+	set_params((int)prob, prob_pool, win_size);
+}
