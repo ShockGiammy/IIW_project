@@ -40,6 +40,11 @@ void set_params(int loss, int pool, long w_size) {
 	win_size = w_size;
 }
 
+void get_params(float *loss, int *size) {
+	*loss = (float)loss_prob/(float)prob_pool;
+	*size = win_size;
+}
+
 
 int make_seg(tcp segment, char *send_segm) {
 

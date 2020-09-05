@@ -78,7 +78,7 @@ void *evadi_richiesta(void *socket_desc) {
 
 	signal(SIGINT, _handler);
 
-	int res = recv_tcp(socket, client_request, BUFSIZ);
+	/*int res = recv_tcp(socket, client_request, BUFSIZ);
 	if(res < 0){
 		res = 0;
 		pthread_exit(&res);
@@ -86,7 +86,7 @@ void *evadi_richiesta(void *socket_desc) {
 
 	strncpy(client, client_request, BUFSIZ);
 	memset(client_request, 0, BUFSIZ);
-	printf("Connection estabilished with %s\n", client);
+	printf("Connection estabilished with %s\n", client);*/
 
 	do {
 		printf("Waiting client request...\n");

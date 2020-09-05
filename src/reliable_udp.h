@@ -131,5 +131,7 @@ char *strremove(char *str, const char *sub);
 unsigned short int calc_checksum(unsigned short*segm, unsigned int count);
 
 
+// to configure loss probability and window size
 void set_params(int loss, int pool, long w_size);
+void get_params(float *loss, int *size);
 #endif  /*  PG_SOCK_HELP  */
