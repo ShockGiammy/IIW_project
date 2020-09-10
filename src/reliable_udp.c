@@ -174,7 +174,7 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	memset(msg, 0, LOG_MSG_SIZE);
 	if(recv_chsum != 0) {
 		printf("The segment has an error\n");
-		return -1;
+		//return -1;
 	}
 	recv_buf_short++;
 
@@ -1012,7 +1012,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		res_extract = extract_segment(segment, recv_buf);
 
 		// invalid segment -> bad checksum
-		if(res_extract < 0){
+		/*if(res_extract < 0){
 			snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Received invalid segment\n", segment->data_length, segment->sequence_number);
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
@@ -1027,7 +1027,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			free(segment);
 			memset(recv_buf, 0, MSS+HEAD_SIZE);
 			continue;
-		}
+		}*/
 
 		// decide how long next to will be
 		received_data = segment->data_length != 0;
@@ -1163,9 +1163,9 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 			finished = true;
 		}
-		if(received_data)
+		if(received_data) 
 			ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win, &bytes_rcvd);
-
+			
 		snprintf(msg, LOG_MSG_SIZE, "recv_tcp\n Tot bytes acked: %d\n", recv_win.tot_acked);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);

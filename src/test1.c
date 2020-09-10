@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <netinet/tcp.h>
+#include <sys/stat.h>
 #include "reliable_udp.h"
 #include "helper.h"
 
