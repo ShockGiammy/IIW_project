@@ -25,7 +25,7 @@
 
 char cmd[10];
 long conn_s;                /*  connection socket         */
-char *path = "client_files";
+char *path = "test_files";
 int test_fd; // the file descriptor of the file we will use for our tests
 
 typedef struct test_results {
@@ -34,14 +34,15 @@ typedef struct test_results {
     struct timeval res_time;
 }results;
 
-int ParseCmdLine(int , char **, char **, char **);
+
 void create_file();
 void save_test_values(results result);
+void set_test_values(struct timeval start, struct timeval end, results *result_struct, int winsize);
 
 
 int main(int argc, char *argv[]) {
-	if(argc < 4) {
-		printf("Sintassi : (valore probabilità perdita (x.xx...)), valore finestra, comando\n");
+	if(argc < 5) {
+		printf("Sintassi : (valore probabilità perdita (x.xx...)), valore finestra, nome_file, comando\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
     results results[10];
     int i = 0;
 
-    short int port = 2000;                  /*  port number               */
+    short int port = 7000;                  /*  port number               */
     struct    sockaddr_in servaddr;  /*  socket address structure  */
     char     *szAddress = "127.0.0.1";             /*  Holds remote IP address   */
     char     *szPort;                /*  Holds remote port         */
@@ -116,95 +117,63 @@ int main(int argc, char *argv[]) {
     }
 
 	do{
-		if(strcmp(argv[3], "get") == 0) {
-			results[i].win_size = win_size;
-			char response[BUFSIZ];
-			send_tcp(conn_s, "get", 3);
-			memset(command, 0, sizeof(char)*(strlen(command)));
+		results[i].win_size = win_size;
+		char response[BUFSIZ];
+		send_tcp(conn_s, argv[4], 3);
+		//memset(command, 0, sizeof(char)*(strlen(command)));
 
-			int n = recv_tcp(conn_s, response, BUFSIZ);
-			if( n < 0 || ( strcmp(response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received %s\n", response);
-				exit(EXIT_FAILURE);
-			}
+		int n = recv_tcp(conn_s, response, BUFSIZ);
+		if( n < 0 || ( strcmp(response, "ready") != 0 )){
+			fprintf(stderr, "Server side error, received %s\n", response);
+			exit(EXIT_FAILURE);
+		}
 
-		//sleep(2);
+		n = send_tcp(conn_s, argv[3], strlen(argv[3]));
+		if( n < 0 ){
+			perror("Send error...\n");
+			exit(EXIT_FAILURE);
+		}
 
-			n = send_tcp(conn_s, "alice29.txt", 12);
-			if( n < 0 ){
-				perror("Send error...\n");
-				exit(EXIT_FAILURE);
-			}
-
-        	gettimeofday(&start, NULL);
-			if( RetrieveFile(conn_s, "alice29.txt", path) < 0 ){
+		sleep(1);
+        gettimeofday(&start, NULL);
+		if(strcmp(argv[4], "get") == 0) { 
+			if( RetrieveFile(conn_s, argv[3], path) < 0 ){
 				fprintf(stderr, "RetrieveFile: error...\n");
 			}
-
-        	gettimeofday(&end, NULL);
-        	results[i].res_time.tv_sec = end.tv_sec - start.tv_sec;
-        	results[i].res_time.tv_usec = end.tv_usec - start.tv_usec;
-        	while(results[i].res_time.tv_usec < 0) {
-            	results[i].res_time.tv_usec += 1000000;
-            	results[i].res_time.tv_sec -= 1;
-        	}
 		}
-		else if(strcmp(argv[3], "put") == 0) {
-			results[i].win_size = win_size;
-			char bufferFile[BUFSIZ];
-
-			int n = send_tcp(conn_s, "put", 3);
-			if( n < 0 ){
-				perror("Could not send command...\n");
-				exit(EXIT_FAILURE);
-			}
-
-			memset(command, 0, sizeof(char)*(strlen(command)+1));
-
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
-				fprintf(stderr, "Server side error, received: %s\n", server_response);
-				exit(EXIT_FAILURE);
-			}
-
-			memset(server_response, 0, BUFSIZ);
-				
-			n = send_tcp(conn_s, "alice29.txt", 12);
-			if( n < 0 ){
-				perror("Could not send filename...\n");
-				exit(EXIT_FAILURE);
-			}
-
+		else if(strcmp(argv[4], "put") == 0) {
 			n = recv_tcp(conn_s, server_response, BUFSIZ);
 			if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
 				fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
 				exit(EXIT_FAILURE);
 			}
-			gettimeofday(&start, NULL);
-			if (SendFile(conn_s, "alice29.txt", bufferFile, path) == 0) {
-				printf("file transfer completed \n");
-				gettimeofday(&end, NULL);
-        		results[i].res_time.tv_sec = end.tv_sec - start.tv_sec;
-        		results[i].res_time.tv_usec = end.tv_usec - start.tv_usec;
-        		while(results[i].res_time.tv_usec < 0) {
-            		results[i].res_time.tv_usec += 1000000;
-            		results[i].res_time.tv_sec -= 1;
-        		}
+			char bufferFile[BUFSIZ];
+			if (SendFile(conn_s, argv[3], bufferFile, path) < 0) {
+				fprintf(stderr, "Error while uploading the file \n");
+				if(close(conn_s) == -1)
+					fprintf(stderr, "Error while closing socket\n");
+				exit(EXIT_FAILURE);
 			}
-			else {
-				printf("file transfer error \n");
-				char error[] = "ERROR";
-				send_tcp(conn_s, error, strlen(error));
-			}
-			//memset(fname, 0, sizeof(char)*(strlen(fname)+1));
-			memset(server_response, 0, BUFSIZ);
 		}
-        save_test_values(results[i]);
+
+        gettimeofday(&end, NULL);
+		set_test_values(start, end, &results[i], win_size);
+		save_test_values(results[i]);
         i++;
 		win_size += 10000;
 		sleep(3);
-
 	}while(i < 10);
+}
+
+
+void set_test_values(struct timeval start, struct timeval end, results *result_struct, int winsize) {
+	result_struct->res_time.tv_sec = end.tv_sec - start.tv_sec;
+    result_struct->res_time.tv_usec = end.tv_usec - start.tv_usec;
+    while(result_struct->res_time.tv_usec < 0) {
+    	result_struct->res_time.tv_usec += 1000000;
+    	result_struct->res_time.tv_sec -= 1;
+    }
+	result_struct->win_size = winsize;
 }
 
 
@@ -247,36 +216,8 @@ void save_test_values(results result) {
 void create_file() {
     FILE *file;
     
-    if(file = fopen("test1.txt", "r"))
-        test_fd = open("test1.txt", O_WRONLY, S_IRWXU);
+    if(file = fopen("test_files/test1.txt", "r"))
+        test_fd = open("test_files/test1.txt", O_WRONLY, S_IRWXU);
     else
-        test_fd = open("test1.txt", O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
-}
-
-
-int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort) {
-    int n = 1;
-
-    while ( n < argc ) {
-		if ( !strncmp(argv[n], "-a", 2) || !strncmp(argv[n], "-A", 2) ) {
-		    *szAddress = argv[++n];
-		}
-		else 
-			if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) ) {
-			    *szPort = argv[++n];
-			}
-			else
-				if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) ) {
-		    		printf("Sintassi:\n\n");
-			    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
-			    	exit(EXIT_SUCCESS);
-				}
-		++n;
-    }
-	if (argc==1) {
-   		printf("Sintassi:\n\n");
-    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
-	    exit(EXIT_SUCCESS);
-	}
-    return 0;
+        test_fd = open("test_files/test1.txt", O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
 }
