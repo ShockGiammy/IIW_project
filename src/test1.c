@@ -40,6 +40,11 @@ void save_test_values(results result);
 
 
 int main(int argc, char *argv[]) {
+	if(argc < 4) {
+		printf("Sintassi : (valore probabilità perdita (x.xx...)), valore finestra, comando\n");
+		exit(EXIT_FAILURE);
+	}
+
     struct timeval start;
     struct timeval end;
     results results[10];
@@ -70,8 +75,8 @@ int main(int argc, char *argv[]) {
 		results[j].loss_prob = loss_prob;
 	}
 
-	init_log("_client_log_");
-    create_file();
+	//init_log("_client_log_");
+    create_file(); // initialize the file for the results
 
     /*  Create the listening socket  */
 
@@ -125,14 +130,14 @@ int main(int argc, char *argv[]) {
 
 		//sleep(2);
 
-			n = send_tcp(conn_s, "lcet10.txt", 10);
+			n = send_tcp(conn_s, "alice29.txt", 12);
 			if( n < 0 ){
 				perror("Send error...\n");
 				exit(EXIT_FAILURE);
 			}
 
         	gettimeofday(&start, NULL);
-			if( RetrieveFile(conn_s, "lcet10.txt", path) < 0 ){
+			if( RetrieveFile(conn_s, "alice29.txt", path) < 0 ){
 				fprintf(stderr, "RetrieveFile: error...\n");
 			}
 
@@ -164,7 +169,7 @@ int main(int argc, char *argv[]) {
 
 			memset(server_response, 0, BUFSIZ);
 				
-			n = send_tcp(conn_s, "lcet10.txt", 10);
+			n = send_tcp(conn_s, "alice29.txt", 12);
 			if( n < 0 ){
 				perror("Could not send filename...\n");
 				exit(EXIT_FAILURE);
@@ -176,7 +181,7 @@ int main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 			}
 			gettimeofday(&start, NULL);
-			if (SendFile(conn_s, "lcet10.txt", bufferFile, path) == 0) {
+			if (SendFile(conn_s, "alice29.txt", bufferFile, path) == 0) {
 				printf("file transfer completed \n");
 				gettimeofday(&end, NULL);
         		results[i].res_time.tv_sec = end.tv_sec - start.tv_sec;
