@@ -110,21 +110,21 @@ int main(int argc, char *argv[]) {
 	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
 
 	/* connessione */
-	printf("Insert a username: ");
-	fflush(stdout);
+	//printf("Insert a username: ");
+	//fflush(stdout);
 
-	if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
+	/*if( select(maxd, &set_sock_stdin, NULL, NULL, NULL) < 0 ){
 		perror("select error\n");
 		exit(EXIT_FAILURE);
-	}
+	}*/
 
 	// might receive connection termination from server
-	if(FD_ISSET(conn_s, &set_sock_stdin)){
+	/*if(FD_ISSET(conn_s, &set_sock_stdin)){
 		char recv_buf[HEAD_SIZE] = { 0 };
 		recv_tcp(conn_s, recv_buf, HEAD_SIZE);
-	}
+	}*/
 
-	if(fgets(username,39,stdin) == NULL) {
+	/*if(fgets(username,39,stdin) == NULL) {
 		printf("fgets error\n");
 		if(close(conn_s) == -1) {
 			printf("Close error \n");
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	username[strlen(username)-1] = '\0';
-	send_tcp(conn_s, username, strlen(username));
+	send_tcp(conn_s, username, strlen(username));*/
 
 	printf("Welcome to the server, %s\n", username);
 	show_menu();
@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
 			command[strlen(command)-1] = '\0';
 			if(strcmp(command, "list") == 0) {
 				send_tcp(conn_s, command, strlen(command));
-				memset(command, 0, sizeof(char)*(strlen(command)));
+				memset(command, 0, sizeof(char)*(strlen(command)+1));
 				printf("Files in the current directory : \n");
 				for(;;){
 					memset(fname, 0, len_filename);
@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
 			else if(strcmp(command,"get") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
-				memset(command, 0, sizeof(char)*(strlen(command)));
+				memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 				int n = recv_tcp(conn_s, response, BUFSIZ);
 				if( n < 0 || ( strcmp(response, "ready") != 0 )){
@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
 				if( RetrieveFile(conn_s, fname, path) < 0 ){
 					//fprintf(stderr, "RetrieveFile: error...\n");
 				}
-				memset(fname, 0, sizeof(char)*(strlen(fname)));
+				memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 				memset(response, 0, BUFSIZ);
 			}
 
@@ -219,7 +219,7 @@ int main(int argc, char *argv[]) {
 					exit(EXIT_FAILURE);
 				}
 
-				memset(command, 0, sizeof(char)*(strlen(command)));
+				memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 				n = recv_tcp(conn_s, server_response, BUFSIZ);
 				if( n < 0 || ( strcmp(server_response, "ready") != 0 )){
@@ -258,13 +258,13 @@ int main(int argc, char *argv[]) {
 			}
 			
 			else if(strcmp(command,"help") == 0){
-				memset(command, 0, sizeof(char)*(strlen(command)));
+				memset(command, 0, sizeof(char)*(strlen(command)+1));
 				show_menu();
 			}
 
 			else {
 				printf("Command not valid\n");
-				memset(command, 0, sizeof(char)*(strlen(command)));
+				memset(command, 0, sizeof(char)*(strlen(command)+1));
 			}
 		}
 	}while(1);

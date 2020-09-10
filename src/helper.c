@@ -38,6 +38,7 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 	strncpy(path, directory_path, strlen(directory_path));
 	strcat(path, "/");
 	strncat(path, file_name, strlen(file_name));
+	
 
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
@@ -99,7 +100,6 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	}
 
 	recv_tcp(socket_desc, buffer, 3);
-	printf("Received: %s\n", buffer);
 	if(strcmp(buffer, "ERR") == 0) {
 		printf("Cannot retrieve file...\n");
 		if (remove(fname) == 0) 
