@@ -23,21 +23,20 @@
 #define MAX_LINE  4096
 static __thread pthread_t thread_id = -1;
 
-int SendFile(int socket_desc, char* file_name, char* response, char *directory_path) {
-
+int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	int first_byte = 0;
 	struct stat	file_stat;
-	//int buf_size = BUFSIZ;
-	//char* buffer = malloc(sizeof(char)*buf_size); 
 	char buffer[BUFSIZE]; //we use this buffer for now, we'll try to use only response buffer
 
 	printf("opening file\n");
 	memset(buffer, 0, BUFSIZE);
 	
 	char path[100];
+	memset(path, 0, 100);
 	strncpy(path, directory_path, strlen(directory_path));
-	strcat(path, "/");
 	strncat(path, file_name, strlen(file_name));
+
+	printf("Path : %s\n", path);
 	
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
@@ -87,17 +86,18 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	memset(buffer, 0, BUFSIZE);
 
 	char path[100];
-	strcpy(path, directory_path);
-	strcat(path, "/");
-	strcat(path, fname);
+	memset(path, 0, 100);
+	strncpy(path, directory_path, strlen(directory_path));
+	strncat(path, fname, strlen(fname));
 
 	//int fd = open(path, O_WRONLY|O_CREAT, S_IRWXU);
 	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
-		printf("%d\n", errno);
+		//printf("%d\n", errno);
 		perror("Unable to create file\n");
 		return -1;
 	}
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 	recv_tcp(socket_desc, buffer, 3);
 	if(strcmp(buffer, "ERR") == 0) {
@@ -266,6 +266,7 @@ char *strremove(char *str, const char *sub) {
     return str;
 }
 
+// used to check if the loss probability and the window size are passed correctly as input
 void check_args(int argc, char *argv[], int start) {
 	if(argc < 3) {
 		printf("Sintassi : ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
