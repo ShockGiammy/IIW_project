@@ -39,7 +39,6 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 	strcat(path, "/");
 	strncat(path, file_name, strlen(file_name));
 	
-
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
 		printf("Error: file not found\n");
@@ -48,6 +47,7 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 		return -1;
 	}
 
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
 
