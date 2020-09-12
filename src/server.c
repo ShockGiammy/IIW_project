@@ -29,7 +29,7 @@
 #include "manage_client.h"
 
 
-char *path = "server_files";
+char *path = "server_files/";
 
 struct    sockaddr_in servaddr;  /*  socket address structure  */
 struct	  sockaddr_in their_addr;
@@ -62,8 +62,6 @@ void *evadi_richiesta(void *socket_desc) {
 
 	char filesName[BUFSIZ];
 	char client_request[BUFSIZ];
-	char server_response[BUFSIZ];
-
 	char client[BUFSIZ];
 	tcp temp;
 
@@ -77,16 +75,6 @@ void *evadi_richiesta(void *socket_desc) {
 	sock_descriptor = socket;
 
 	signal(SIGINT, _handler);
-
-	/*int res = recv_tcp(socket, client_request, BUFSIZ);
-	if(res < 0){
-		res = 0;
-		pthread_exit(&res);
-	}
-
-	strncpy(client, client_request, BUFSIZ);
-	memset(client_request, 0, BUFSIZ);
-	printf("Connection estabilished with %s\n", client);*/
 
 	do {
 		printf("Waiting client request...\n");
@@ -105,22 +93,33 @@ void *evadi_richiesta(void *socket_desc) {
 	        	send_tcp(socket, result, strlen(result));
 	    	}
 
+			short int tot_size = 0;
+			while ((de = readdir(dr)) != NULL) {
+				tot_size += de->d_reclen;
+			}
+			tot_size = ntohs(tot_size);
+			send_tcp(socket, &tot_size, sizeof(tot_size));
+
 			int len_filename = 50;
-			while ((de = readdir(dr)) != NULL){
-    	        char string[len_filename];
-				memset(string, 0, len_filename);
-        	    strncpy(string, de->d_name, len_filename - 2);
-				string[strlen(string)] = '\n';
-	        	printf("%s", string);
-			    send_tcp(socket, string, strlen(string));
+			DIR *new_dr = opendir(path);
+			while ((de = readdir(new_dr)) != NULL){
+				if(strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
+    	        	char string[len_filename];
+					memset(string, 0, len_filename);
+        	    	strncpy(string, de->d_name, len_filename - 2);
+					string[strlen(string)] = '\n';
+	        		printf("%s", string);
+			    	send_tcp(socket, string, strlen(string));
+				}
     		}
-			char stop[] = "STOP";
-			send_tcp(socket, stop, strlen(stop));
+			//char stop[] = "";
+			//send_tcp(socket, stop, 1);
 	    	closedir(dr);
+			closedir(new_dr);
 	    	printf("file listing completed\n");
 		}
 
-		else if (strcmp(client_request, "get") == 0) {
+		else if (strcmp(client_request, "get") == 0 || strcmp(client_request, "put") == 0) {
 			printf("command GET entered\n");
 			fflush(stdout);
 			memset(filesName, 0, BUFSIZ);
@@ -135,40 +134,28 @@ void *evadi_richiesta(void *socket_desc) {
 				pthread_exit(&ret);
 			}
 			printf("file name is %s\n", filesName);
-			memset(server_response, 0, BUFSIZ);
 
-			if (SendFile(socket, filesName, server_response, path) == 0) {
-				printf("file transfer completed\n");
+			if(strcmp(client_request, "get") == 0) {
+				if (SendFile(socket, filesName, path) == 0) {
+					printf("file transfer completed\n");
+				}
+				else {
+					printf("file transfer error\n");
+				}
 			}
-			else {
-				printf("file transfer error\n");
-			}
-			memset(filesName, 0, BUFSIZ);
-			memset(server_response, 0, BUFSIZ);
-		}
+			else if(strcmp(client_request, "put") == 0) {
+				char *resp = "rcvd fn";
+				send_tcp(socket, resp, strlen(resp)+1);
 
-		else if (strcmp(client_request, "put") == 0) {
-			char* resp;
-			printf("command PUT entered\n");
-			fflush(stdout);
-
-			resp = "ready";
-			send_tcp(socket, "ready", 6);
-
-			recv_tcp(socket, filesName, 50);
-			printf("file name is %s \n", filesName);
-
-			resp = "rcvd fn";
-			send_tcp(socket, resp, strlen(resp)+1);
-
-			if(RetrieveFile(socket, filesName, path) < 0){
-				fprintf(stderr, "RetrieveFile: error...\n");
+				if(RetrieveFile(socket, filesName, path) < 0){
+					fprintf(stderr, "RetrieveFile: error...\n");
+				}
 			}
 		}
+
 		memset(filesName, 0, sizeof(char)*(strlen(filesName) + 1));
 		memset(client_request, 0, BUFSIZ);
 		memset(&temp, 0, sizeof(temp));
-		memset(server_response, 0, BUFSIZ);
 	} while(1);
 }
 
@@ -210,17 +197,10 @@ int process_manager(int list_s) {
 int main(int argc, char *argv[]) {
 	
 	char     *endptr;                /*  for strtol()              */   
-    short int port = 2000;                  /*  port number, fixed               */
+    short int port = 7000;                  /*  port number, fixed               */
 	int       list_s;                /*  listening socket          */
 	/*  Get command line arguments  */
 	pid_t pids[PROCESSES];
-	
-	/*ParseCmdLine(argc, argv, &endptr);
-	port = strtol(endptr, &endptr, 0);
-	if ( *endptr ) { 
-	    fprintf(stderr, "server: unknown port\n");
-	    exit(EXIT_FAILURE);
-	}*/
 
 	check_args(argc, argv, 1);
     

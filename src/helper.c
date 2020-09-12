@@ -23,23 +23,20 @@
 #define MAX_LINE  4096
 static __thread pthread_t thread_id = -1;
 
-int SendFile(int socket_desc, char* file_name, char* response, char *directory_path) {
-
+int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	int first_byte = 0;
 	struct stat	file_stat;
-	//int buf_size = BUFSIZ;
-	//char* buffer = malloc(sizeof(char)*buf_size); 
-	char buffer[BUFSIZE]; //we use this buffer for now, we'll try to use only response buffer
+	int win_size = get_win_size();
+	char buffer[win_size]; //we use this buffer for now, we'll try to use only response buffer
 
 	printf("opening file\n");
-	memset(buffer, 0, BUFSIZE);
+	memset(buffer, 0, win_size);
 	
 	char path[100];
+	memset(path, 0, 100);
 	strncpy(path, directory_path, strlen(directory_path));
-	strcat(path, "/");
 	strncat(path, file_name, strlen(file_name));
 	
-
 	int fd = open(path, O_RDONLY);
 	if (fstat(fd, &file_stat) == -1) {
 		printf("Error: file not found\n");
@@ -48,6 +45,7 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 		return -1;
 	}
 
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
 
@@ -61,7 +59,7 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 
 	/* Sending file data */
 	int n_read = 0;
-	while( (n_read = read(fd, buffer, BUFSIZE)) > 0){
+	while( (n_read = read(fd, buffer, win_size)) > 0){
 		if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
 			perror("File transmission error...\n");
 			return -1;
@@ -73,7 +71,7 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 		printf("Sent %d bytes\n\n", n_send);
 		sent_bytes += n_read;
 		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
-		memset(buffer, 0, BUFSIZE);
+		memset(buffer, 0, win_size);
 		/*buf_size = calculate_window_dimension();
 		free(buffer);
 		char* buffer = malloc(sizeof(char)*buf_size);*/
@@ -83,21 +81,23 @@ int SendFile(int socket_desc, char* file_name, char* response, char *directory_p
 }
 
 int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
-	char buffer[BUFSIZE];
-	memset(buffer, 0, BUFSIZE);
+	int win_size = get_win_size();
+	char buffer[win_size];
+	memset(buffer, 0, win_size);
 
 	char path[100];
-	strcpy(path, directory_path);
-	strcat(path, "/");
-	strcat(path, fname);
+	memset(path, 0, 100);
+	strncpy(path, directory_path, strlen(directory_path));
+	strncat(path, fname, strlen(fname));
 
 	//int fd = open(path, O_WRONLY|O_CREAT, S_IRWXU);
 	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
-		printf("%d\n", errno);
+		//printf("%d\n", errno);
 		perror("Unable to create file\n");
 		return -1;
 	}
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 	recv_tcp(socket_desc, buffer, 3);
 	if(strcmp(buffer, "ERR") == 0) {
@@ -109,7 +109,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 		return -1;
 	}
 
-	memset(buffer, 0, BUFSIZE);
+	memset(buffer, 0, win_size);
 
 	int filesize;
 	recv_tcp(socket_desc, &filesize, sizeof(filesize));
@@ -121,7 +121,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	int bytes_recvd = 0;
 	int bytes_wrttn = 0;
 	int tot_bytes_wr = 0;
-	int recv_bytes_buffer = BUFSIZE < filesize ? BUFSIZE : filesize;
+	int recv_bytes_buffer = win_size < filesize ? win_size : filesize;
 
 	while(tot_bytes_wr < filesize ){
 		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
@@ -136,8 +136,8 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 		}
 		tot_bytes_wr += bytes_wrttn;
 		printf("%d / %d bytes written...\n", tot_bytes_wr, filesize);
-		memset(buffer, 0, BUFSIZE);
-		recv_bytes_buffer = (filesize - tot_bytes_recvd) < BUFSIZE ? (filesize - tot_bytes_recvd) : BUFSIZE;
+		memset(buffer, 0, win_size);
+		recv_bytes_buffer = (filesize - tot_bytes_recvd) < win_size ? (filesize - tot_bytes_recvd) : win_size;
 	}
 	close(fd);
 	printf("File transfer complete!\n");
@@ -266,6 +266,7 @@ char *strremove(char *str, const char *sub) {
     return str;
 }
 
+// used to check if the loss probability and the window size are passed correctly as input
 void check_args(int argc, char *argv[], int start) {
 	if(argc < 3) {
 		printf("Sintassi : ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
@@ -283,25 +284,12 @@ void check_args(int argc, char *argv[], int start) {
 		exit(EXIT_FAILURE);
 	}
 
-	// we scale our float to see which will be the range
-	int n_digit = 0;
-	while((prob/10) < 1) {
-		prob = prob*10;
-		n_digit++;
-	}
-
-	int prob_pool = 1;
-	// we compute the power of the probability pool
-	while(n_digit > 0) {
-		prob_pool = prob_pool*10;
-		n_digit--; 
-	}
-
 	long win_size;
 	if((win_size = strtol(argv[start+1], NULL, 10)) == 0) {
 		printf("Invalid window size\n");
 		exit(EXIT_FAILURE);
 	}
 
-	set_params((int)prob, prob_pool, win_size);
+	printf("Parameters for this run : probability of loss : %f\n", prob);
+	set_params(prob, win_size);
 }
