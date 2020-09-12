@@ -194,8 +194,13 @@ int main(int argc, char *argv[]) {
 				}
 
 				printf("Enter the name of the file you want to receive: ");
-				scanf("%s",fname);
-				getchar();	// remove newline
+
+				fgets(fname, len_filename, stdin);
+
+    			/* Remove trailing newline, if there. */
+
+    			if ((strlen(fname) > 0) && (fname[strlen (fname) - 1] == '\n'))
+        			fname[strlen (fname) - 1] = '\0';
 				
 				n = send_tcp(conn_s, fname, strlen(fname));
 				if( n < 0 ){
@@ -230,8 +235,14 @@ int main(int argc, char *argv[]) {
 				memset(server_response, 0, BUFSIZ);
 				
 				printf("Enter the name of the file you want to update: ");
-				scanf("%s",fname);
-				getchar();	// remove newline
+				
+				fgets(fname, len_filename, stdin);
+
+    			/* Remove trailing newline, if there. */
+
+    			if ((strlen(fname) > 0) && (fname[strlen (fname) - 1] == '\n'))
+        			fname[strlen (fname) - 1] = '\0';
+				
 				
 				n = send_tcp(conn_s, fname, strlen(fname));
 				if( n < 0 ){
