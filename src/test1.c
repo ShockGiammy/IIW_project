@@ -25,7 +25,7 @@
 
 char cmd[10];
 long conn_s;                /*  connection socket         */
-char *path = "test_files";
+char *path = "test_files/";
 int test_fd; // the file descriptor of the file we will use for our tests
 
 typedef struct test_results {
@@ -35,9 +35,11 @@ typedef struct test_results {
 }results;
 
 
+// fucntions prototypes
 void create_file();
 void save_test_values(results result);
-void set_test_values(struct timeval start, struct timeval end, results *result_struct, int winsize);
+void set_test_values(struct timeval *result, struct timeval start, struct timeval end);
+void calc_avg_times(results *test_result, struct timeval *times);
 
 
 int main(int argc, char *argv[]) {
@@ -48,7 +50,8 @@ int main(int argc, char *argv[]) {
 
     struct timeval start;
     struct timeval end;
-    results results[10];
+    results test_result;
+	struct timeval times[5]; // this array will keep the times that we register in the test
     int i = 0;
 
     short int port = 7000;                  /*  port number               */
@@ -68,13 +71,8 @@ int main(int argc, char *argv[]) {
 	he=NULL;
 	check_args(argc, argv, 1);
 	
-	float loss_prob = 0.0; 
-	int win_size = 0;
-	get_params(&loss_prob, &win_size);
-
-	for(int j = 0; j < 10; j++) {
-		results[j].loss_prob = loss_prob;
-	}
+	memset(&test_result, 0, sizeof(test_result));
+	get_params(&test_result.loss_prob, &test_result.win_size);
 
 	//init_log("_client_log_");
     create_file(); // initialize the file for the results
@@ -116,8 +114,8 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
+	// repeats the test 5 times, then saves the test result in a file
 	do{
-		results[i].win_size = win_size;
 		char response[BUFSIZ];
 		send_tcp(conn_s, argv[4], 3);
 		//memset(command, 0, sizeof(char)*(strlen(command)));
@@ -134,7 +132,7 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 
-		sleep(1);
+		//sleep(1);
         gettimeofday(&start, NULL);
 		if(strcmp(argv[4], "get") == 0) { 
 			if( RetrieveFile(conn_s, argv[3], path) < 0 ){
@@ -156,23 +154,45 @@ int main(int argc, char *argv[]) {
 		}
 
         gettimeofday(&end, NULL);
-		set_test_values(start, end, &results[i], win_size);
-		save_test_values(results[i]);
+		set_test_values(&times[i], start, end);
         i++;
-		win_size += 10000;
-		sleep(3);
-	}while(i < 10);
+		//win_size += 10000;
+		//sleep(3);
+	}while(i < 2);
+	
+	// computes the average time and saves the result no the file
+	calc_avg_times(&test_result, times);
+	save_test_values(test_result);
+	close_initiator_tcp(conn_s);
 }
 
 
-void set_test_values(struct timeval start, struct timeval end, results *result_struct, int winsize) {
-	result_struct->res_time.tv_sec = end.tv_sec - start.tv_sec;
-    result_struct->res_time.tv_usec = end.tv_usec - start.tv_usec;
-    while(result_struct->res_time.tv_usec < 0) {
-    	result_struct->res_time.tv_usec += 1000000;
-    	result_struct->res_time.tv_sec -= 1;
+void set_test_values(struct timeval *result, struct timeval start, struct timeval end) {
+	result->tv_sec = end.tv_sec - start.tv_sec;
+    result->tv_usec = end.tv_usec - start.tv_usec;
+    while(result->tv_usec < 0) {
+    	result->tv_usec += 1000000;
+    	result->tv_sec -= 1;
     }
-	result_struct->win_size = winsize;
+}
+
+
+void calc_avg_times(results *test_result, struct timeval *times) {
+	time_t avg_secs = 0;
+	suseconds_t avg_usecs = 0;
+
+	for(int i = 0; i < 2; i++) {
+		avg_secs += times[i].tv_sec;
+		avg_usecs += times[i].tv_usec;
+	}
+
+	test_result->res_time.tv_sec = avg_secs/10;
+	test_result->res_time.tv_usec = avg_usecs/10;
+
+	while(test_result->res_time.tv_usec > 1000000) {
+		test_result->res_time.tv_sec += 1;
+		test_result->res_time.tv_usec -= 1000000;
+	}
 }
 
 
@@ -203,7 +223,7 @@ void save_test_values(results result) {
     strcat(file_msg, temp);
 
     memset(temp, 0, sizeof(char)*(strlen(temp)+1));
-	strcat(file_msg, "\n");
+	strcat(file_msg, "\n\n");
 
     lseek(test_fd, 0, SEEK_END);
     write(test_fd, file_msg, strlen(file_msg));

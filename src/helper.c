@@ -102,9 +102,10 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	recv_tcp(socket_desc, buffer, 3);
 	if(strcmp(buffer, "ERR") == 0) {
 		printf("Cannot retrieve file...\n");
-		if (remove(fname) == 0) 
+		if (remove(path) == 0) 
       		printf("Deleted created file successfully\n"); 
    		else
+		   	printf("%d\n", errno);
       		perror("Unable to delete the file\n"); 
 		return -1;
 	}
@@ -279,8 +280,8 @@ void check_args(int argc, char *argv[], int start) {
 		printf("Invalid loss probability\n");
 		exit(EXIT_FAILURE);
 	}
-	else if(prob == 1) {
-		printf("Loss prob = 1, the software will not be that trivial :D \n");
+	else if(prob == 100) {
+		printf("Loss prob = 100% , the software will not be that trivial :D \n");
 		exit(EXIT_FAILURE);
 	}
 
