@@ -653,6 +653,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 	memset(data_buf, 0, MSS);
 
+	/* used to set the congestion window if it's the first time the client/server send a packet*/
 	if(cong.cong_win == 0){
 		cong.state = 0;
 		cong.cong_win = MSS;
@@ -690,7 +691,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo;
 	memset(&send_timeo, 0, sizeof(send_timeo));
-	send_timeo.time.tv_sec = 5; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
 
 	struct timeval start_rtt;
 	struct timeval finish_rtt;
@@ -847,10 +848,12 @@ int send_tcp(int sockd, void* buf, size_t size){
 							#endif
 
 							sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+
+							/*to update the congetion window*/
 							congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
 							check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-						//fast retransmission
+							//fast retransmission
 							if(sender_wind.dupl_ack == 3) {
 								times_retx++;
 
@@ -860,8 +863,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 									memset(msg, 0, LOG_MSG_SIZE);
 								#endif
 
+								/*to update the congetion window*/
 								congestion_control_duplicateAck(sender_wind);
 								check_size_buffer(sender_wind, recv_segm.receiver_window);
+
 								retx(send_segm, sender_wind, send_buf, sockd);
 								gettimeofday(&start_rtt, NULL);
 							}
@@ -874,6 +879,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 								return -1;
 							}
 							sender_wind.bytes_acked_current_transmission += bytes_acked;
+
+							/*to update the congetion window*/
 							congestion_control_receiveAck(sender_wind);
 							check_size_buffer(sender_wind, recv_segm.receiver_window);
 
@@ -892,6 +899,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				// estimates the timeout and sets the new values
 				gettimeofday(&finish_rtt, NULL);
 				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+
 				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
 					return -1;
@@ -905,8 +913,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(msg, 0, LOG_MSG_SIZE);
 				#endif
 
+				/*to update the congetion window*/
 				congestion_control_timeout(sender_wind);
 				check_size_buffer(sender_wind, recv_segm.receiver_window);
+
 				retx(send_segm, sender_wind, send_buf, sockd);
 				gettimeofday(&start_rtt, NULL);
 			}
@@ -941,23 +951,15 @@ int send_tcp(int sockd, void* buf, size_t size){
 	return sender_wind.bytes_acked_current_transmission;
 }
 
-int calculate_window_dimension() {
-	if (cong.cong_win < win_size) {
-		return cong.cong_win;
-	}
-	else {
-		return win_size;
-	}
-}
-
+/*function to implement the congestion control in case of Ack correctly received*/
 int congestion_control_receiveAck(slid_win sender_wind) {
 
 	switch(cong.state)
 	{
-		case 0:
+		case 0:		//slow_start
 			cong.cong_win = cong.cong_win + MSS;
 			if (cong.cong_win > cong.threshold) {
-				cong.state = 1;
+				cong.state = 1;		// go to congestion_avoidance
 				
 				#ifdef ACTIVE_LOG
 					snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: Entered in Congestion Avoidance\n");
@@ -967,7 +969,7 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 			}
 			break;
 
-		case 1:
+		case 1:		//congestion_avoidance
 			cong.support_variable = cong.support_variable + (int)floor(MSS*MSS/cong.cong_win);
 
 			#ifdef ACTIVE_LOG
@@ -978,13 +980,13 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 
 			if (cong.support_variable >= CONG_SCALING_MSS_THRESHOLD) {
 				cong.cong_win = cong.cong_win + MSS;
-				cong.support_variable = 0;
+				cong.support_variable = 0;		// go to slow_stat
 			}
 			break;
 
-		case 2:
+		case 2:		//fast_recovery
 			cong.cong_win = cong.threshold;
-			cong.state = 1;
+			cong.state = 1;		// go to congestion_avoidance
 
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_receiveAck: Entered in Congestion Avoidance\n");
@@ -997,11 +999,12 @@ int congestion_control_receiveAck(slid_win sender_wind) {
 	return 0;
 }
 
+/*function to implement the congestion control in case of duplicate ACK*/
 int congestion_control_duplicateAck(slid_win sender_wind) {
 	switch(cong.state)
 	{
-		case 0:
-			cong.state = 2;
+		case 0:		//slow_start
+			cong.state = 2;		// go to fast_recovery
 			
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_duplicateAck: Entered in Fast Recovery\n");
@@ -1013,8 +1016,8 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 			cong.cong_win = cong.threshold + 3*MSS;
 			break;
 
-		case 1:
-			cong.state = 2;
+		case 1:		//congestion_avoidance
+			cong.state = 2;		// go to fast_recovery
 
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_duplicateAck: Entered in Fast Recovery\n");
@@ -1026,29 +1029,31 @@ int congestion_control_duplicateAck(slid_win sender_wind) {
 			cong.cong_win = cong.threshold + 3*MSS;
 			break;
 
-		case 2:
-			// caso già gestito
+		case 2:		//fast_recovery
+			// case already managed
 			break;
 	}
 	return 0;
 }
 
+/*function to implement the congestion control when status is Fast Recovery*/
 int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind) {
 	if (cong.state == 2) {
 		cong.cong_win = cong.cong_win + MSS;
 	}
 }
 
+/*function to implement the congestion control in case of timeout*/
 int congestion_control_timeout(slid_win sender_wind) {
 	switch(cong.state)
 	{
-		case 0:
+		case 0:		//slow_start
 			cong.threshold = cong.cong_win/2;
 			cong.cong_win = MSS;
 			break;
 
-		case 1:
-			cong.state = 0;
+		case 1:		//congestion_avoidance
+			cong.state = 0;		// go to slow_start
 
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_timeout: Entered in Slow Start\n");
@@ -1060,8 +1065,8 @@ int congestion_control_timeout(slid_win sender_wind) {
 			cong.cong_win = MSS;
 			break;
 
-		case 2:
-			cong.state = 0;
+		case 2:		//fast_recovery
+			cong.state = 0;		// go to slow_start
 
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "congestion_control_timeout: Entered in Slow Start\n");
@@ -1076,6 +1081,7 @@ int congestion_control_timeout(slid_win sender_wind) {
 	return 0;
 }
 
+/*function to update the size of the sender windows*/
 int check_size_buffer(slid_win sender_wind, int receiver_window) {
 	if (cong.cong_win < receiver_window) {
 		sender_wind.max_size = cong.cong_win;
@@ -1090,8 +1096,6 @@ int check_size_buffer(slid_win sender_wind, int receiver_window) {
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 	#endif
-
-	//printf("congwin = %d\n", cong.cong_win);
 
 	return 0;
 }

@@ -1,9 +1,9 @@
 /*
-
   HELPER.H
   ========
 
 */
+
 #include <stdbool.h>
 #include <sys/types.h>
 #include <stdlib.h>

@@ -1,9 +1,9 @@
 /*
-
   RELIABLE_UDP.h
   ========
 
 */
+
 #include <stdbool.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@ typedef struct congestion_struct
   int cong_win;
   int threshold;
   int support_variable;
-  int state;      // 0 = slow_stat
+  int state;      // 0 = slow_start
                   // 1 = congestion_avoidance
                   // 2 = fast_recovery
 } cong_struct;
@@ -121,7 +121,6 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes);
 void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
 void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
-int calculate_window_dimension();
 int congestion_control_receiveAck(slid_win sender_wind);
 int congestion_control_caseFastRetrasmission_duplicateAck(slid_win sender_wind);
 int congestion_control_duplicateAck(slid_win sender_wind);
