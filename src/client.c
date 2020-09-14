@@ -1,3 +1,9 @@
+/*
+  CLIENT.C
+  ========
+  
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,6 +99,7 @@ int main(int argc, char *argv[]) {
 		servaddr.sin_addr = *((struct in_addr *)he->h_addr_list);
     }
    	signal(SIGINT,_handler);
+
     /*  connect() to the remote server  */
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(servaddr.sin_family, &servaddr.sin_addr, address_string, INET_ADDRSTRLEN);
@@ -141,6 +148,8 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			command[strlen(command)-1] = '\0';
+
+			/*command LIST*/
 			if(strcmp(command, "list") == 0) {
 				send_tcp(conn_s, command, strlen(command));
 				memset(command, 0, sizeof(char)*(strlen(command)+1));
@@ -158,10 +167,10 @@ int main(int argc, char *argv[]) {
 				memset(files, 0, sizeof(char)*(strlen(files)+1));
 			}
 
+			/*command GET*/
 			else if(strcmp(command,"get") == 0 || strcmp(command,"put") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
-				//memset(command, 0, sizeof(char)*(strlen(command)+1));
 
 				int n = recv_tcp(conn_s, response, BUFSIZ);
 				if( n < 0 || ( strcmp(response, "ready") != 0 )){
@@ -192,6 +201,8 @@ int main(int argc, char *argv[]) {
 						fprintf(stderr, "RetrieveFile: error...\n");
 					}
 				}
+
+				/*command PUT*/
 				else if(strcmp(command, "put") == 0) {
 					memset(response, 0, sizeof(char)*(strlen(response)+1));
 					n = recv_tcp(conn_s, server_response, BUFSIZ);
@@ -209,11 +220,14 @@ int main(int argc, char *argv[]) {
 						send_tcp(conn_s, error, strlen(error));
 					}
 				}
+
+				/*clean buffers*/
 				memset(fname, 0, sizeof(char)*(strlen(fname)+1));
 				memset(command, 0, sizeof(char)*(strlen(command)+1));
 				memset(response, 0, BUFSIZ);
 			}
 			
+			/*command HELP*/
 			else if(strcmp(command,"help") == 0){
 				memset(command, 0, sizeof(char)*(strlen(command)+1));
 				show_menu();

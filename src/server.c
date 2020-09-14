@@ -2,8 +2,6 @@
   TCPSERVER.C
   ==========
 */
-/*please compile with -pthread */
-
 
 #include <sys/socket.h>       /*  socket definitions        */
 #include <sys/types.h>        /*  socket types              */
@@ -82,6 +80,7 @@ void *evadi_richiesta(void *socket_desc) {
 		printf("Waiting client request...\n");
 		recv_tcp(socket, client_request, BUFSIZ);
 		
+		/*command LIST*/
 		if (strcmp(client_request, "list") == 0) {
 			printf("command LIST entered\n");
 			fflush(stdout);
@@ -114,13 +113,12 @@ void *evadi_richiesta(void *socket_desc) {
 			    	send_tcp(socket, string, strlen(string));
 				}
     		}
-			//char stop[] = "";
-			//send_tcp(socket, stop, 1);
 	    	closedir(dr);
 			closedir(new_dr);
 	    	printf("file listing completed\n");
 		}
 
+		/*command GET and PUT*/
 		else if (strcmp(client_request, "get") == 0 || strcmp(client_request, "put") == 0) {
 			printf("command GET entered\n");
 			fflush(stdout);
@@ -137,6 +135,7 @@ void *evadi_richiesta(void *socket_desc) {
 			}
 			printf("file name is %s\n", filesName);
 
+			/*command GET*/
 			if(strcmp(client_request, "get") == 0) {
 				if (SendFile(socket, filesName, path) == 0) {
 					printf("file transfer completed\n");
@@ -145,6 +144,8 @@ void *evadi_richiesta(void *socket_desc) {
 					printf("file transfer error\n");
 				}
 			}
+
+			/*command PUT*/
 			else if(strcmp(client_request, "put") == 0) {
 				char *resp = "rcvd fn";
 				send_tcp(socket, resp, strlen(resp)+1);
@@ -161,6 +162,7 @@ void *evadi_richiesta(void *socket_desc) {
 	} while(1);
 }
 
+/* signal used to wake up a child process*/
 void wake_up(int signum) {
 	if (signum == SIGUSR1)
     {
@@ -168,12 +170,15 @@ void wake_up(int signum) {
     }
 }
 
+/*function where processes are waiting new connections*/
 int process_manager(int list_s) {
+
 	int sin_size;
 	int conn_s;
 	pthread_t tid;
 	int *conn = malloc(sizeof(int));
 
+	/*to manage the arrival of the signal*/
 	signal(SIGUSR1, wake_up);
 
 	printf("process %d is waiting to accept connection\n", getpid());
@@ -188,6 +193,8 @@ int process_manager(int list_s) {
 	   		exit(EXIT_FAILURE);
 		}
 		*conn = conn_s;
+
+		/*create a new thread to manage the connection*/
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
 			perror("server : cannot create thread\n");
 			exit(EXIT_FAILURE);
@@ -201,9 +208,9 @@ int main(int argc, char *argv[]) {
 	char     *endptr;                /*  for strtol()              */   
     short int port = 7000;                  /*  port number, fixed               */
 	int       list_s;                /*  listening socket          */
-	/*  Get command line arguments  */
 	pid_t pids[PROCESSES];
 
+	/*  Get command line arguments  */
 	check_args(argc, argv, 1);
     
 	printf("Server in ascolto sulla porta %d\n\n\n",port);
@@ -215,6 +222,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
+	/*pre_forking of the child processes*/
 	for (int i = 0; i < PROCESSES; i++) {
 		int pid;
 		pid = fork();
@@ -278,7 +286,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 			/* Se è arrivata una richiesta di connessione, il socket di ascolto
-			è leggibile: viene invocata accept() e creato un socket di connessione */
+			è leggibile: viene invocata accept() e creata una socket di connessione */
 			if (FD_ISSET(list_s, &rset)) {
 				kill(pids[process_to_wake_up], SIGUSR1);
 			}

@@ -7,7 +7,7 @@ CSRC	= client.c
 all: $(CLIENT) $(SERVER)
 
 $(SERVER): $(SERVER).o reliable_udp.o helper.o manage_client.o
-	gcc -o $(SERVER) $(SERVER).o reliable_udp.o helper.o manage_client.o  -pthread
+	gcc -o $(SERVER) $(SERVER).o reliable_udp.o helper.o manage_client.o -pthread
 
 $(SERVER).o: $(SSRC) reliable_udp.h helper.h manage_client.h
 	gcc -o $(SERVER).o $(SSRC) -c -pthread
