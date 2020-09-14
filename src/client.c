@@ -56,7 +56,9 @@ int main(int argc, char *argv[]) {
 
 	check_args(argc, argv, 5);
 
-	init_log("_client_log_");
+	#ifdef ACTIVE_LOG
+		init_log("_client_log_");
+	#endif
 
     /*  Set the remote port  */
     port = strtol(szPort, &endptr, 0);

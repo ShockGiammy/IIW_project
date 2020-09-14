@@ -48,8 +48,10 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	memset(path, 0, sizeof(char)*(strlen(path)+1));
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
-
+	
 	int filesize = htonl(file_stat.st_size);
+
+	printf("Size : %d, converted : %d\n", file_stat.st_size, filesize);
 	send_tcp(socket_desc, &filesize, sizeof(filesize));
 
 	int offset = 0;

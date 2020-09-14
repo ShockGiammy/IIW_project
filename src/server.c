@@ -70,7 +70,9 @@ void *evadi_richiesta(void *socket_desc) {
 	int socket = *(int*)socket_desc;
 	free((int*)socket_desc);
 
-	init_log("_server_log_");
+	#ifdef ACTIVE_LOG
+		init_log("_server_log_");
+	#endif
 
 	sock_descriptor = socket;
 
