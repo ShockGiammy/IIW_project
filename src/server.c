@@ -277,12 +277,10 @@ int main(int argc, char *argv[]) {
 				perror("errore in select");
 				exit(1);
 			}
-			//printf("new connection\n");
 			/* Se è arrivata una richiesta di connessione, il socket di ascolto
 			è leggibile: viene invocata accept() e creato un socket di connessione */
 			if (FD_ISSET(list_s, &rset)) {
 				kill(pids[process_to_wake_up], SIGUSR1);
-				//printf("signal sent\n");
 			}
 			process_to_wake_up = (process_to_wake_up+1)%10;
 		}

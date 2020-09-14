@@ -72,9 +72,6 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 		sent_bytes += n_read;
 		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
 		memset(buffer, 0, win_size);
-		/*buf_size = calculate_window_dimension();
-		free(buffer);
-		char* buffer = malloc(sizeof(char)*buf_size);*/
 	}
 	
 	return 0;
@@ -93,22 +90,20 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	//int fd = open(path, O_WRONLY|O_CREAT, S_IRWXU);
 	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
-		//printf("%d\n", errno);
 		perror("Unable to create file\n");
 		return -1;
 	}
-	memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 	recv_tcp(socket_desc, buffer, 3);
 	if(strcmp(buffer, "ERR") == 0) {
 		printf("Cannot retrieve file...\n");
 		if (remove(path) == 0) 
-      		printf("Deleted created file successfully\n"); 
+      		printf("File successfully deleted\n"); 
    		else
-		   	printf("%d\n", errno);
-      		perror("Unable to delete the file\n"); 
+      		perror("Unable to delete the file"); 
 		return -1;
 	}
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 	memset(buffer, 0, win_size);
 
@@ -126,7 +121,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 
 	while(tot_bytes_wr < filesize ){
 		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
-			fprintf(stderr, "RetrieveFile: %s\n", strerror(errno));
+			fprintf(stderr, "\nRetrieveFile: %s\n", strerror(errno));
 			return -1;
 		}
 		tot_bytes_recvd += bytes_recvd;
@@ -281,7 +276,7 @@ void check_args(int argc, char *argv[], int start) {
 		exit(EXIT_FAILURE);
 	}
 	else if(prob == 100) {
-		printf("Loss prob = 100% , the software will not be that trivial :D \n");
+		printf("Loss prob = 100%%, the software will not be that trivial :D \n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -291,6 +286,6 @@ void check_args(int argc, char *argv[], int start) {
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Parameters for this run : probability of loss : %f\n", prob);
+	printf("Parameters for this run : probability of loss : %f%%\n", prob);
 	set_params(prob, win_size);
 }
