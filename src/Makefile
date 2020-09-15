@@ -18,6 +18,9 @@ $(CLIENT): $(CLIENT).o reliable_udp.o helper.o manage_client.o
 $(CLIENT).o: $(CSRC) reliable_udp.h helper.h manage_client.h
 	gcc -o $(CLIENT).o $(CSRC) -c -pthread
 
+test: test.o reliable_udp.o helper.o manage_client.o
+	gcc -o test test.o reliable_udp.o helper.o manage_client.o -pthread
+
 reliable_udp.o: reliable_udp.c reliable_udp.h
 	gcc -o reliable_udp.o reliable_udp.c -c
 
@@ -31,3 +34,4 @@ clean:
 	rm -f *.o
 	rm -f $(CLIENT)
 	rm -f $(SERVER)
+	rm -f test

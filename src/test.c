@@ -22,6 +22,7 @@
 #define MAX_LINE  4096
 #define STDIN 0
 #define COMMAND_SIZE 10
+#define TRANSFER_ATTEMPTS 1
 
 char cmd[10];
 long conn_s;                /*  connection socket         */
@@ -54,19 +55,16 @@ int main(int argc, char *argv[]) {
 	struct timeval times[10]; // this array will keep the times that we register in the test
     int i = 0;
 
-    short int port = 7000;                  /*  port number               */
-    struct    sockaddr_in servaddr;  /*  socket address structure  */
-    char     *szAddress = "127.0.0.1";             /*  Holds remote IP address   */
-    char     *szPort;                /*  Holds remote port         */
-    char     *endptr;                /*  for strtol()              */
+    short int port = 7000;                  /*  port number 			  */
+    struct    sockaddr_in servaddr;  		/*  socket address structure  */
+    char     *szAddress = "127.0.0.1";      /*  Holds remote IP address   */
+    char     *szPort;                		/*  Holds remote port         */
+    char     *endptr;                		/*  for strtol()              */
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
 	char exitBuffer[10];
-	char username[40];
 	char server_response[BUFSIZ];
-
-	memset(username, 0, sizeof(username));
 
 	he=NULL;
 	check_args(argc, argv, 1);
@@ -74,7 +72,6 @@ int main(int argc, char *argv[]) {
 	memset(&test_result, 0, sizeof(test_result));
 	get_params(&test_result.loss_prob, &test_result.win_size);
 
-	//init_log("_client_log_");
     create_file(); // initialize the file for the results
 
     /*  Create the listening socket  */
@@ -99,7 +96,7 @@ int main(int argc, char *argv[]) {
 			printf("failed\n");
   			exit(EXIT_FAILURE);
 		}
-		printf("succeeded\n\n");
+		printf("succeded\n\n");
 		servaddr.sin_addr = *((struct in_addr *)he->h_addr_list);
     }
 
@@ -114,7 +111,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
     }
 
-	// repeats the test 5 times, then saves the test result in a file
+	// repeats the test TRANSFER_ATTEMPTS times, then saves the test result in a file 
 	do{
 		char response[BUFSIZ];
 		send_tcp(conn_s, argv[4], 3);
@@ -132,7 +129,7 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 
-		//sleep(1);
+		sleep(1);
         gettimeofday(&start, NULL);
 		if(strcmp(argv[4], "get") == 0) { 
 			if( RetrieveFile(conn_s, argv[3], path) < 0 ){
@@ -158,7 +155,7 @@ int main(int argc, char *argv[]) {
         i++;
 		//win_size += 10000;
 		//sleep(3);
-	}while(i < 1);
+	}while(i < TRANSFER_ATTEMPTS);
 	
 	// computes the average time and saves the result no the file
 	calc_avg_times(&test_result, times);
@@ -181,13 +178,13 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
 
-	for(int i = 0; i < 1; i++) {
+	for(int i = 0; i < TRANSFER_ATTEMPTS; i++) {
 		avg_secs += times[i].tv_sec;
 		avg_usecs += times[i].tv_usec;
 	}
 
-	test_result->res_time.tv_sec = avg_secs/10;
-	test_result->res_time.tv_usec = avg_usecs/10;
+	test_result->res_time.tv_sec = avg_secs/TRANSFER_ATTEMPTS;
+	test_result->res_time.tv_usec = avg_usecs/TRANSFER_ATTEMPTS;
 
 	while(test_result->res_time.tv_usec > 1000000) {
 		test_result->res_time.tv_sec += 1;
@@ -198,7 +195,7 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 
 void save_test_values(results result) {
     char file_msg[1024];
-    char temp[20];
+    char temp[50];
 
     sprintf(temp, "%f ", result.loss_prob);
     strcat(file_msg, "Loss probability: ");
@@ -208,18 +205,23 @@ void save_test_values(results result) {
     memset(temp, 0, sizeof(char)*(strlen(temp)+1));
 
     sprintf(temp, "%d ", result.win_size);
-    strcat(file_msg, "Window size: ");
+    strcat(file_msg, "| Window size: ");
     strcat(file_msg, temp);
 
     memset(temp, 0, sizeof(char)*(strlen(temp)+1));
 
     sprintf(temp, "%ld ", result.res_time.tv_sec);
-    strcat(file_msg, "Time: ");
+    strcat(file_msg, "| Time: ");
     strcat(file_msg, temp);
 
     memset(temp, 0, sizeof(char)*(strlen(temp)+1));
     
-    sprintf(temp, "%ld ", result.res_time.tv_usec);
+    sprintf(temp, "%ld\n", result.res_time.tv_usec);
+    strcat(file_msg, temp);
+
+    memset(temp, 0, sizeof(char)*(strlen(temp)+1));
+
+	sprintf(temp, "Average time calculated on %d executions", TRANSFER_ATTEMPTS);
     strcat(file_msg, temp);
 
     memset(temp, 0, sizeof(char)*(strlen(temp)+1));
