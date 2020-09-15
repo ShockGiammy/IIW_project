@@ -1159,7 +1159,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		// invalid segment -> bad checksum
 		if(res_extract < 0){
 			#ifdef ACTIVE_LOG
-				snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Received invalid segment\n", segment->data_length, segment->sequence_number);
+				snprintf(msg, LOG_MSG_SIZE, "recv_tcp: Received invalid segment\n");
 				print_on_log(fd, msg);
 				memset(msg, 0, LOG_MSG_SIZE);
 			#endif

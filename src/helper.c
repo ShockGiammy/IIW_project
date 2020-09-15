@@ -57,7 +57,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	
 	unsigned long long filesize = htobe64(sz);
 
-	printf("Size : %lld, converted : %lld\n", file_stat.st_size, filesize);
+	printf("Size : %ld, converted : %lld\n", file_stat.st_size, filesize);
 	send_tcp(socket_desc, &filesize, sizeof(filesize));
 
 	unsigned long long offset = 0;
@@ -76,7 +76,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 		// 	fprintf(stderr, "Did not send as much data as read!\nread: %d\nsent: %d\n", n_read, n_send);
 		// 	return -1;
 		// }
-		printf("Sent %d bytes\n\n", n_send);
+		printf("Sent %lld bytes\n\n", n_send);
 		sent_bytes += n_read;
 		printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
 		memset(buffer, 0, win_size);
@@ -133,7 +133,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 			return -1;
 		}
 		tot_bytes_recvd += bytes_recvd;
-		printf("Received %d new bytes...\n", bytes_recvd);
+		printf("Received %lld new bytes...\n", bytes_recvd);
 		if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
 			perror("File transmission error...\n");
 			return -1;
