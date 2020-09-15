@@ -235,8 +235,8 @@ void save_test_values(results result) {
 void create_file() {
     FILE *file;
     
-    if(file = fopen("test_files/test1.txt", "r"))
-        test_fd = open("test_files/test1.txt", O_WRONLY, S_IRWXU);
+    if(file = fopen("test_files/test.txt", "r"))
+        test_fd = open("test_files/test.txt", O_WRONLY, S_IRWXU);
     else
-        test_fd = open("test_files/test1.txt", O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
+        test_fd = open("test_files/test.txt", O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
 }
