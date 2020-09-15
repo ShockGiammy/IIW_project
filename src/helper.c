@@ -3,6 +3,7 @@
   ========
   
 */
+
 #define _FILE_OFFSET_BITS 64
 
 #include <stdlib.h>
@@ -75,10 +76,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 			perror("File transmission error...\n");
 			return -1;
 		}
-		// if(n_read != n_send){
-		// 	fprintf(stderr, "Did not send as much data as read!\nread: %d\nsent: %d\n", n_read, n_send);
-		// 	return -1;
-		// }
+		
 		printf("Sent %lld bytes\n\n", n_send);
 		sent_bytes += n_read;
 		printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
@@ -99,7 +97,6 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	strncpy(path, directory_path, strlen(directory_path));
 	strncat(path, fname, strlen(fname));
 
-	//int fd = open(path, O_WRONLY|O_CREAT, S_IRWXU);
 	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
 		perror("Unable to create file\n");
