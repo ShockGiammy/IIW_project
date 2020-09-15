@@ -44,7 +44,7 @@ void calc_avg_times(results *test_result, struct timeval *times);
 
 int main(int argc, char *argv[]) {
 	if(argc < 5) {
-		printf("Sintassi : (valore probabilità perdita (x.xx...)), valore finestra, nome_file, comando\n");
+		printf("Sintax : ./test loss probability(xx.xx..) window size filename command\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -176,7 +176,7 @@ void set_test_values(struct timeval *result, struct timeval start, struct timeva
     }
 }
 
-
+//computes the average time for the test
 void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
@@ -195,7 +195,7 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	}
 }
 
-
+// saves the test result on a file
 void save_test_values(results result) {
     char file_msg[1024];
     char temp[20];

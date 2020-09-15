@@ -24,12 +24,14 @@
 #define MAX_LINE  4096
 static __thread pthread_t thread_id = -1;
 
+// used to send a file
 int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	int first_byte = 0;
 	struct stat	file_stat;
 	int win_size = get_win_size();
 	char buffer[win_size]; //we use this buffer for now, we'll try to use only response buffer
 
+	// opens the file using the right path
 	printf("opening file\n");
 	memset(buffer, 0, win_size);
 	
@@ -50,12 +52,13 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
 
+	// we need to seek till the end of the file to obtain the size, in case the file size is bigger than INT_MAX
 	FILE *fp = fdopen(fd, "r");
 	fseeko(fp, 0L, SEEK_END);
 	unsigned long long sz = ftell(fp);
 	rewind(fp);
 	
-	unsigned long long filesize = htobe64(sz);
+	unsigned long long filesize = htobe64(sz); // converts the byte order
 
 	printf("Size : %lld, converted : %lld\n", file_stat.st_size, filesize);
 	send_tcp(socket_desc, &filesize, sizeof(filesize));
@@ -85,6 +88,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	return 0;
 }
 
+//used to download a file
 int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	int win_size = get_win_size();
 	char buffer[win_size];
@@ -115,6 +119,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 
 	memset(buffer, 0, win_size);
 
+	//receive and parse the file size
 	unsigned long long filesize;
 	recv_tcp(socket_desc, &filesize, sizeof(filesize));
 	filesize = be64toh(filesize);
@@ -127,6 +132,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	unsigned long long tot_bytes_wr = 0;
 	unsigned long long recv_bytes_buffer = win_size < filesize ? win_size : filesize;
 
+	// read until all the bytes are received
 	while(tot_bytes_wr < filesize ){
 		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
 			fprintf(stderr, "\nRetrieveFile: %s\n", strerror(errno));
@@ -152,7 +158,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 /* This set of function aims to create a log file to keep tracks of server-client interaction, usefull to debug the code
 in case of failure*/
 
-
+// creates the log file 
 int create_log_file(char *file_name) {
 	FILE *file;
 
@@ -182,6 +188,7 @@ int create_log_file(char *file_name) {
 	return fd;
 }
 
+// print a message on the log with a timestamp
 int print_on_log(int log_fd, char *msg) {
 	char log_msg[LOG_MSG_SIZE];
 	memset(log_msg, 0, LOG_MSG_SIZE);
