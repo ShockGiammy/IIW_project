@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 	he=NULL;
 
 	if(argc < 7) {
-		printf("Syntax : ./client -a (server ip) -p (port) loss porbability (xx.xxx...) window size");
+		printf("Syntax: ./client -a (server ip) -p (port) loss_probability (xx.xxx...) window_size");
 		exit(EXIT_FAILURE);
 	}
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     /*  Set the remote IP address  */
 
     if ( inet_aton(szAddress, &servaddr.sin_addr) <= 0 ) {
-		printf("client: IP address not valid.\nclient: IP addresso lookup...");
+		printf("client: IP address not valid.\nclient: IP address lookup...");
 		
 		if ((he=gethostbyname(szAddress)) == NULL) {
 			printf("failed\n");

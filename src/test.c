@@ -44,7 +44,7 @@ void calc_avg_times(results *test_result, struct timeval *times);
 
 int main(int argc, char *argv[]) {
 	if(argc < 5) {
-		printf("Sintax : ./test loss probability(xx.xx..) window size filename command\n");
+		printf("Syntax: ./test loss_probability (xx.xx..) window_size filename command\n");
 		exit(EXIT_FAILURE);
 	}
 

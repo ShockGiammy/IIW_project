@@ -280,7 +280,7 @@ char *strremove(char *str, const char *sub) {
 // used to check if the loss probability and the window size are passed correctly as input
 void check_args(int argc, char *argv[], int start) {
 	if(argc < 3) {
-		printf("Sintassi: ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
+		printf("Syntax: ./server loss_probability (xx.xx..) window_size\n");
 		exit(EXIT_FAILURE);
 	}
 

@@ -199,7 +199,7 @@ int process_manager(int list_s) {
 
 		/*create a new thread to manage the connection*/
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
-			perror("Server : cannot create thread\n");
+			perror("Server: cannot create thread\n");
 			exit(EXIT_FAILURE);
 		}
 		insert_thread_in_list(tid, &thread_list);
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 
 	/*  Get command line arguments  */
 	if(argc < 3) {
-		printf("Sintax : ./server loss probability (xx.xx...) windows size");
+		printf("Syntax: ./server loss_probability (xx.xx...) windows_size");
 		exit(EXIT_FAILURE);
 	}
 	check_args(argc, argv, 1);
