@@ -52,10 +52,7 @@ int main(int argc, char *argv[]) {
 
 	char command[COMMAND_SIZE];
 	char exitBuffer[10];
-	char username[40];
 	char server_response[BUFSIZ];
-
-	memset(username, 0, sizeof(username));
 
 	he=NULL;
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
@@ -118,7 +115,7 @@ int main(int argc, char *argv[]) {
 
 	int maxd = (STDIN_FILENO < conn_s) ? (conn_s + 1): (STDIN_FILENO + 1);
 
-	printf("Welcome to the server, %s\n", username);
+	printf("Welcome to the server\n");
 	show_menu();
 
 	do{
@@ -159,7 +156,7 @@ int main(int argc, char *argv[]) {
 				tot_size = ntohs(tot_size);
 				char files[tot_size];
 
-				printf("Files in the current directory : \n");
+				printf("Files in the current directory: \n");
 				memset(fname, 0, len_filename);
 				recv_tcp(conn_s, files, tot_size);
 				printf("%s", files);
@@ -243,10 +240,10 @@ int main(int argc, char *argv[]) {
 
 void show_menu() {
 	printf("\nMenù: \n");
-	printf("list: per visualizzare i file disponibili al download\n");
-	printf("get: per richiedere un determinato file\n");
-	printf("put: per caricare sul server un certo file\n");
-	printf("help: per visualizzare il menù\n\n");
+	printf("list: to visualize the files available for download\n");
+	printf("get: to request the download of a certain file\n");
+	printf("put: to upload on server a certain file\n");
+	printf("help: to show the menù\n\n");
 }
 
 int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort) {

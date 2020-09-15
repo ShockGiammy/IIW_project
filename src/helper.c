@@ -267,7 +267,7 @@ char *strremove(char *str, const char *sub) {
 // used to check if the loss probability and the window size are passed correctly as input
 void check_args(int argc, char *argv[], int start) {
 	if(argc < 3) {
-		printf("Sintassi : ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
+		printf("Sintassi: ./server (valore probabilità di perdita) (valore finestra spedizione)\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -288,6 +288,6 @@ void check_args(int argc, char *argv[], int start) {
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Parameters for this run : probability of loss : %f%%\n", prob);
+	printf("Parameters for this execution: probability of loss: %f%%\n", prob);
 	set_params(prob, win_size);
 }
