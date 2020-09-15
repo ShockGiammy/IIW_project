@@ -56,6 +56,7 @@ void _handler(int sigo) {
 	pthread_exit(&res);
 }
 
+// manage the requests of a single client
 void *evadi_richiesta(void *socket_desc) {
 
 	char filesName[BUFSIZ];
@@ -73,7 +74,7 @@ void *evadi_richiesta(void *socket_desc) {
 
 	sock_descriptor = socket;
 
-	signal(SIGINT, _handler);
+	signal(SIGINT, _handler); // handler sigint
 
 	do {
 		printf("Waiting client request...\n");
@@ -213,6 +214,10 @@ int main(int argc, char *argv[]) {
 	pid_t pids[PROCESSES];
 
 	/*  Get command line arguments  */
+	if(argc < 3) {
+		printf("Sintax : ./server loss probability (xx.xx...) windows size");
+		exit(EXIT_FAILURE);
+	}
 	check_args(argc, argv, 1);
     
 	printf("Server listening on port %d\n\n\n",port);
@@ -307,14 +312,14 @@ int ParseCmdLine(int argc, char *argv[], char **szPort){
 		else 
 			if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) ) {
 			    printf("Sintassi:\n\n");
-	    		    printf("    server -p (porta) [-h]\n\n");
+	    		    printf("    server -p (port) [-h]\n\n");
 			    exit(EXIT_SUCCESS);
 			}
 		++n;
     }
     if (argc==1) {
 	printf("Sintassi:\n\n");
-    	printf("    server -p (porta) [-h]\n\n");
+    	printf("    server -p (port) [-h]\n\n");
 	exit(EXIT_SUCCESS);
     }
     return 0;

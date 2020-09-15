@@ -55,6 +55,11 @@ int main(int argc, char *argv[]) {
 	char server_response[BUFSIZ];
 
 	he=NULL;
+
+	if(argc < 7) {
+		printf("Syntax : ./client -a (server ip) -p (port) loss porbability (xx.xxx...) window size");
+		exit(EXIT_FAILURE);
+	}
 	ParseCmdLine(argc, argv, &szAddress, &szPort);
 
 	check_args(argc, argv, 5);

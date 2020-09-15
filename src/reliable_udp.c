@@ -253,9 +253,11 @@ int count_acked (int min, int max, int acknum) {
 	return j;
 }
 
-// function called when it's necessary to retx a segment with TCP fast retx
+// function called when it's necessary to retx a segment with TCP fast retx or due to a timeout
 void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	bool retransmitted = false;
+
+	// finds the correct segment that have to be retransmitted
 	for(int i = 0; i < MAX_BUF_SIZE; i++) {
 		#ifdef ACTIVE_LOG
 			snprintf(msg, LOG_MSG_SIZE, "%d == %d ?\n", win.next_to_ack, segments[i].sequence_number);
@@ -278,6 +280,8 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 			break;
 		}
 	}
+
+	// means that the segment is not in the list anymore
 	if(!retransmitted){
 		fprintf(stderr, "retx failed\n");
 		exit(EXIT_FAILURE);
@@ -444,7 +448,8 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, int* by
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
-
+		
+		// increments the next_to_ack so that multiple segments can be acked
 		if((current)->sequence_number == win->next_to_ack) {
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "write_all: Manipolo %d, lunghezza dati %d, copio in %p\n", current->sequence_number, current->data_length, *buf);
@@ -455,7 +460,8 @@ int write_all(char** buf, int list_size, tcp **segm_buff, slid_win *win, int* by
 			int n = current->data_length;
 			memcpy(*buf, current->data, n);
 			//printf("write_all: \nData: %s\nCopied: %s\n", current->data, *buf);
-			
+
+			// sildes the window
 			*buf += n;
 			//printf("write_all: last_to_ack %d -> ", win->last_to_ack);
 			win->last_to_ack += n;
@@ -613,6 +619,7 @@ void reorder_list(tcp *segment_list, int size) {
 	}
 }
 
+// called from the receiver to free the segments it has acked
 void free_segms_in_buff(tcp ** head, int n_free) {
 	tcp* temp;
 	for(int i = 0; i < n_free; i++) {
@@ -669,7 +676,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 	sender_wind.on_the_fly = 0;
 	sender_wind.bytes_acked_current_transmission = 0;
 	int ret = 0;
-		
+	
+	// initialize the structs
 	for(int j=0; j < MAX_BUF_SIZE-1; j++)
 		memset(&send_segm[j], 0, sizeof(tcp));
 	
@@ -689,10 +697,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 		memset(msg, 0, LOG_MSG_SIZE);
 	#endif
 
-	time_out send_timeo;
+	time_out send_timeo; // the tcp timeout will be kept in this struct
 	memset(&send_timeo, 0, sizeof(send_timeo));
 	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
 
+	// useful to get strat time and end time
 	struct timeval start_rtt;
 	struct timeval finish_rtt;
 
@@ -703,6 +712,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	int index = 0; // sender segments list index
 
+	// we continue to send new segment / recevie acks untile we have sent and acked size bytes
 	while(bytes_left_to_send > 0 || sender_wind.bytes_acked_current_transmission < size) {
 
 		#ifdef ACTIVE_LOG
@@ -731,6 +741,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 		
+		// we can send bytes, the sending window is not full
 		if((bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size)) {
 
 			fd_set set_sock_send = { 0 };
@@ -793,6 +804,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 
+		// we check if the window is full and so we see if we recevied an ack
 		if(sender_wind.on_the_fly >= sender_wind.max_size || n_read >= size) {
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "send_tcp: Waiting for ack...\n");
@@ -840,6 +852,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 							memset(msg, 0, LOG_MSG_SIZE);
 						#endif
 
+						// check if it is a duplicate ack
 						if(recv_segm.ack_number == sender_wind.next_to_ack) {
 							#ifdef ACTIVE_LOG
 								snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
@@ -871,6 +884,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 								gettimeofday(&start_rtt, NULL);
 							}
 						}
+
+						// the segment contains a new ack, unpack it and slide the window
 						else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
 							// printf("Ack OK. Sliding the window...\n");
 							int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
@@ -934,7 +949,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
 	
-	// resets the time-out
+	// resets the time-out for a new client request
 	send_timeo.time.tv_sec = 0;
 	send_timeo.time.tv_usec = 0;
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
@@ -1121,7 +1136,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		recv_win.last_to_ack = win_size-MSS;
 	}
 
-	tcp ack;
+	tcp ack; // the struct used to ack the segments
 	int list_length = 0;
 	int res_extract = 0;
 	recv_win.rcvwnd = size;
@@ -1137,6 +1152,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 	int bytes_rcvd = 0;
 	int n_delayed_ack = 0;
 
+	// goes on until all the bytes are received and acked
 	while (!finished && ((n = recv(sockd, recv_buf, MSS+HEAD_SIZE, 0)) > 0)) {
 		
 		#ifdef ACTIVE_LOG
@@ -1333,6 +1349,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			finished = true;
 		}
 
+		// acks all the segment received in order
 		if(received_data) 
 			ack_segments(&buf_ptr, sockd, &list_length, &buf_segm, &ack, &recv_win, &bytes_rcvd);
 			
