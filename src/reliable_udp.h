@@ -3,6 +3,8 @@
   ========
 
 */
+// we define this at first so that the off_t will be 64-bit
+#define _FILE_OFFSET_BITS 64
 
 #include <stdbool.h>
 #include <sys/types.h>
@@ -11,6 +13,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include <limits.h>
+#include <endian.h>
 
 
 #define LISTENQ          (1024)   /*  Backlog for listen()   */
@@ -32,7 +35,7 @@
 
 #define PROCESSES 10
 
-#undef ACTIVE_LOG
+#define ACTIVE_LOG
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 typedef struct tcp_segment

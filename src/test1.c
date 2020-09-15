@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
         i++;
 		//win_size += 10000;
 		//sleep(3);
-	}while(i < 1);
+	}while(i < 5);
 	
 	// computes the average time and saves the result no the file
 	calc_avg_times(&test_result, times);
@@ -181,7 +181,7 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
 
-	for(int i = 0; i < 1; i++) {
+	for(int i = 0; i < 5; i++) {
 		avg_secs += times[i].tv_sec;
 		avg_usecs += times[i].tv_usec;
 	}

@@ -510,7 +510,7 @@ void prepare_segment(tcp * segment, slid_win *wind, char *data, int ack_num,  in
 	memset(&(segment[index]), 0, sizeof(*segment));
 	memcpy(segment[index].data, data, n_byte);
 	segment[index].data_length = n_byte;
-	fill_struct(&segment[index], wind->next_seq_num, ack_num, wind->rcvwnd, ack, fin, syn);
+	fill_struct(&segment[index], (wind->next_seq_num%= INT_MAX), (ack_num%= INT_MAX), wind->rcvwnd, ack, fin, syn);
 
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "prepare_segment\nSEQ_NUM: %d\nASF: %d%d%d\n", wind->next_seq_num, segment[index].ack, segment[index].syn, segment[index].fin);
@@ -627,7 +627,7 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 	float p = ((float)rand()/(float)(RAND_MAX)) *100;
 
 	// we check if we will "lose" the segment
-	if(p > loss_prob) {
+	if(p >= loss_prob) {
 		int n_send = send(sockd, segm_to_go, n_bytes, 0);
 
 		#ifdef ACTIVE_LOG

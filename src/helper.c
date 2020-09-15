@@ -3,6 +3,7 @@
   ========
   
 */
+#define _FILE_OFFSET_BITS 64
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,19 +49,24 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	memset(path, 0, sizeof(char)*(strlen(path)+1));
 	send_tcp(socket_desc, "OK", 2);
 	printf("Sent OK\n");
-	
-	int filesize = htonl(file_stat.st_size);
 
-	printf("Size : %ld, converted : %d\n", file_stat.st_size, filesize);
+	FILE *fp = fdopen(fd, "r");
+	fseeko(fp, 0L, SEEK_END);
+	unsigned long long sz = ftell(fp);
+	rewind(fp);
+	
+	unsigned long long filesize = htobe64(sz);
+
+	printf("Size : %lld, converted : %lld\n", file_stat.st_size, filesize);
 	send_tcp(socket_desc, &filesize, sizeof(filesize));
 
-	int offset = 0;
-	int remain_data = file_stat.st_size;
-	int sent_bytes = 0;
-	int n_send = 0;
+	unsigned long long offset = 0;
+	unsigned long long remain_data = sz;
+	unsigned long long sent_bytes = 0;
+	unsigned long long n_send = 0;
 
 	/* Sending file data */
-	int n_read = 0;
+	unsigned long long n_read = 0;
 	while( (n_read = read(fd, buffer, win_size)) > 0){
 		if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
 			perror("File transmission error...\n");
@@ -72,7 +78,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 		// }
 		printf("Sent %d bytes\n\n", n_send);
 		sent_bytes += n_read;
-		printf("%d / %d sent...\n\n", sent_bytes, remain_data);
+		printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
 		memset(buffer, 0, win_size);
 	}
 	
@@ -109,17 +115,17 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 
 	memset(buffer, 0, win_size);
 
-	int filesize;
+	unsigned long long filesize;
 	recv_tcp(socket_desc, &filesize, sizeof(filesize));
-	filesize = ntohl(filesize);
+	filesize = be64toh(filesize);
 
-	printf("File size is: %d\n", filesize);
+	printf("File size is: %lld\n", filesize);
 
-	int tot_bytes_recvd = 0;
-	int bytes_recvd = 0;
-	int bytes_wrttn = 0;
-	int tot_bytes_wr = 0;
-	int recv_bytes_buffer = win_size < filesize ? win_size : filesize;
+	unsigned long long tot_bytes_recvd = 0;
+	unsigned long long bytes_recvd = 0;
+	unsigned long long bytes_wrttn = 0;
+	unsigned long long tot_bytes_wr = 0;
+	unsigned long long recv_bytes_buffer = win_size < filesize ? win_size : filesize;
 
 	while(tot_bytes_wr < filesize ){
 		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
@@ -133,7 +139,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 			return -1;
 		}
 		tot_bytes_wr += bytes_wrttn;
-		printf("%d / %d bytes written...\n", tot_bytes_wr, filesize);
+		printf("%lld / %lld bytes written...\n", tot_bytes_wr, filesize);
 		memset(buffer, 0, win_size);
 		recv_bytes_buffer = (filesize - tot_bytes_recvd) < win_size ? (filesize - tot_bytes_recvd) : win_size;
 	}
