@@ -60,7 +60,6 @@ void *evadi_richiesta(void *socket_desc) {
 
 	char filesName[BUFSIZ];
 	char client_request[BUFSIZ];
-	char client[BUFSIZ];
 	tcp temp;
 
 	struct stat stat_buf;
@@ -184,19 +183,22 @@ int process_manager(int list_s) {
 	printf("process %d is waiting to accept connection\n", getpid());
 	
 	while(1) {
-		pause();
 
 		/*  Wait for a connection, then accept() it  */
+		pause();
 		sin_size = sizeof(struct sockaddr_in);
+
+		/* If a connection request has arrived, the listening socket
+			is readable: accept_tcp() is called and a connection socket is created */
 		if ( (conn_s = accept_tcp(list_s, (struct sockaddr *)&their_addr, &sin_size) ) < 0 ) {
-		    perror("server: error while accepting client connection\n");
+		    perror("Server: error while accepting client connection\n");
 	   		exit(EXIT_FAILURE);
 		}
 		*conn = conn_s;
 
 		/*create a new thread to manage the connection*/
 		if(pthread_create(&tid,NULL,(void*)evadi_richiesta,(void*)conn) != 0) {
-			perror("server : cannot create thread\n");
+			perror("Server : cannot create thread\n");
 			exit(EXIT_FAILURE);
 		}
 		insert_thread_in_list(tid, &thread_list);
@@ -206,19 +208,19 @@ int process_manager(int list_s) {
 int main(int argc, char *argv[]) {
 	
 	char     *endptr;                /*  for strtol()              */   
-    short int port = 7000;                  /*  port number, fixed               */
+    short int port = 7000;           /*  port number, fixed        */
 	int       list_s;                /*  listening socket          */
 	pid_t pids[PROCESSES];
 
 	/*  Get command line arguments  */
 	check_args(argc, argv, 1);
     
-	printf("Server in ascolto sulla porta %d\n\n\n",port);
+	printf("Server listening on port %d\n\n\n",port);
 	
 	/*  Create the listening socket  */
 
     if ( (list_s = socket(PF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
-		fprintf(stderr, "server: creation socket error\n%s\n", strerror(errno));
+		fprintf(stderr, "Server: creation socket error\n%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
     }
 
@@ -249,7 +251,7 @@ int main(int argc, char *argv[]) {
 	listening socket, and call listen()  */
 
     if ( bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
-		fprintf(stderr, "server: errore durante la bind.\n");
+		fprintf(stderr, "Server: error during the bind.\n");
 		exit(EXIT_FAILURE);
     }
 
@@ -259,15 +261,15 @@ int main(int argc, char *argv[]) {
 	serve per segnalare al thread evadi_richiesta che l'utente è stato aggiunto alla chat corretta */
 	gen_id = semget(IPC_PRIVATE,2, IPC_CREAT | 0666);
 	if(gen_id == -1) {
-		printf("Errore semget \n");
+		printf("Error semget \n");
 		exit(-1);
 	}
 	if(semctl(gen_id,0,SETVAL,1) == -1) {
-		printf("Errore semctl \n");
+		printf("Error semctl \n");
 		exit(-1);
 	}
 	if(semctl(gen_id,1,SETVAL,0) == -1) {
-		printf("Errore sul secondo token in semctl \n");
+		printf("Error on second token in semctl \n");
 		exit(-1);
 	}
 
@@ -276,17 +278,16 @@ int main(int argc, char *argv[]) {
 	int selector = 0;
     while ( 1 ) {
 
-		FD_ZERO(&rset); /* inizializza a 0 il set dei descrittori in lettura */
-		FD_SET(list_s, &rset); /* inserisce il descrittore del socket */
+		FD_ZERO(&rset); /* initializes the set of read descriptors to 0 */
+		FD_SET(list_s, &rset); /* inserts the socket descriptor */
 
 		if (selector == 0) {
 
-			if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* attende descrittore pronto in lettura */
-				perror("errore in select");
+			if (select(list_s + 1, &rset, NULL, NULL, NULL) < 0 ) { /* waits for the descriptor to be ready to read */
+				perror("Error on select");
 				exit(1);
 			}
-			/* Se è arrivata una richiesta di connessione, il socket di ascolto
-			è leggibile: viene invocata accept() e creata una socket di connessione */
+			/* If a connection request has arrived, signals to a process to wake up and manage that request */
 			if (FD_ISSET(list_s, &rset)) {
 				kill(pids[process_to_wake_up], SIGUSR1);
 			}
