@@ -120,7 +120,12 @@ void *evadi_richiesta(void *socket_desc) {
 
 		/*command GET and PUT*/
 		else if (strcmp(client_request, "get") == 0 || strcmp(client_request, "put") == 0) {
-			
+			if(strcmp(client_request, "get") == 0)
+				printf("command GET entered\n");
+			else if(strcmp(client_request, "put") == 0)
+				printf("command PUT entered\n");
+				
+			fflush(stdout);
 			memset(filesName, 0, BUFSIZ);
 			
 			// tell client that the server is ready
