@@ -35,7 +35,7 @@
 
 #define PROCESSES 10
 
-#define ACTIVE_LOG
+#undef ACTIVE_LOG
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 typedef struct tcp_segment

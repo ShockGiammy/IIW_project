@@ -104,7 +104,7 @@ void *evadi_richiesta(void *socket_desc) {
 			int len_filename = 50;
 			DIR *new_dr = opendir(path);
 			while ((de = readdir(new_dr)) != NULL){
-				if(strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
+				if(strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0 && strstr(de->d_name, "__temp") == NULL) {
     	        	char string[len_filename];
 					memset(string, 0, len_filename);
         	    	strncpy(string, de->d_name, len_filename - 2);
