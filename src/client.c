@@ -192,34 +192,41 @@ int main(int argc, char *argv[]) {
     			if ((strlen(fname) > 0) && (fname[strlen (fname) - 1] == '\n'))
         			fname[strlen (fname) - 1] = '\0';
 				
-				n = send_tcp(conn_s, fname, strlen(fname));
-				if( n < 0 ){
-					perror("Send error...\n");
-					exit(EXIT_FAILURE);
+				if (strstr(fname, "__temp") != NULL) {
+					n = send_tcp(conn_s, "invalid", strlen("invalid"));
+					printf("Please remove '__temp' from file name and retry...\n");
 				}
+				else {
+					n = send_tcp(conn_s, fname, strlen(fname));
 
-				if(strcmp(command, "get") == 0) {
-					if( RetrieveFile(conn_s, fname, path) < 0 ){
-						fprintf(stderr, "RetrieveFile: error...\n");
-					}
-				}
-
-				/*command PUT*/
-				else if(strcmp(command, "put") == 0) {
-					memset(response, 0, sizeof(char)*(strlen(response)+1));
-					n = recv_tcp(conn_s, server_response, BUFSIZ);
-					if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-						fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
+					if( n < 0 ){
+						perror("Send error...\n");
 						exit(EXIT_FAILURE);
 					}
 
-					if (SendFile(conn_s, fname, path) == 0) {
-						printf("file transfer completed \n");
+					if(strcmp(command, "get") == 0) {
+						if( RetrieveFile(conn_s, fname, path) < 0 ){
+							fprintf(stderr, "RetrieveFile: error...\n");
+						}
 					}
-					else {
-						printf("file transfer error \n");
-						char error[] = "ERROR";
-						send_tcp(conn_s, error, strlen(error));
+
+					/*command PUT*/
+					else if(strcmp(command, "put") == 0) {
+						memset(response, 0, sizeof(char)*(strlen(response)+1));
+						n = recv_tcp(conn_s, server_response, BUFSIZ);
+						if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
+							fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
+							exit(EXIT_FAILURE);
+						}
+
+						if (SendFile(conn_s, fname, path) == 0) {
+							printf("file transfer completed \n");
+						}
+						else {
+							printf("file transfer error \n");
+							char error[] = "ERROR";
+							send_tcp(conn_s, error, strlen(error));
+						}
 					}
 				}
 
