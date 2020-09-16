@@ -159,11 +159,8 @@ void *evadi_richiesta(void *socket_desc) {
 						printf("file transfer error\n");
 					}
 				}
-
 				/*command PUT*/
 				else if(strcmp(client_request, "put") == 0) {
-					char *resp = "rcvd fn";
-					send_tcp(socket, resp, strlen(resp)+1);
 
 					if(RetrieveFile(socket, filesName, path) < 0){
 						fprintf(stderr, "RetrieveFile: error...\n");
