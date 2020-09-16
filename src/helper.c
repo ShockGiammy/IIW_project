@@ -31,59 +31,71 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	struct stat	file_stat;
 	int win_size = get_win_size();
 	char buffer[win_size]; //we use this buffer for now, we'll try to use only response buffer
-
-	// opens the file using the right path
-	printf("opening file\n");
 	memset(buffer, 0, win_size);
-	
-	char path[100];
-	memset(path, 0, 100);
-	strncpy(path, directory_path, strlen(directory_path));
-	strncat(path, file_name, strlen(file_name));
-	
-	int fd = open(path, O_RDONLY);
-	if (fstat(fd, &file_stat) == -1) {
-		printf("Error: file not found\n");
-		send_tcp(socket_desc, "ERR", 3);
+
+	recv_tcp(socket_desc, buffer, 4);
+	if (strcmp(buffer, "WAIT") == 0) {
+		printf("File already in uploading by an other user, please wait and retry\n");
 		fflush(stdout);
+		memset(buffer, 0, win_size);
 		return -1;
 	}
+	else {
+		memset(buffer, 0, win_size);
 
-	memset(path, 0, sizeof(char)*(strlen(path)+1));
-	send_tcp(socket_desc, "OK", 2);
-	printf("Sent OK\n");
-
-	// we need to seek till the end of the file to obtain the size, in case the file size is bigger than INT_MAX
-	FILE *fp = fdopen(fd, "r");
-	fseeko(fp, 0L, SEEK_END);
-	unsigned long long sz = ftell(fp);
-	rewind(fp);
+		// opens the file using the right path
+		printf("opening file\n");
 	
-	unsigned long long filesize = htobe64(sz); // converts the byte order
+		char path[100];
+		memset(path, 0, 100);
+		strncpy(path, directory_path, strlen(directory_path));
+		strncat(path, file_name, strlen(file_name));
 
-	printf("Size : %ld, converted : %lld\n", file_stat.st_size, filesize);
-	send_tcp(socket_desc, &filesize, sizeof(filesize));
-
-	unsigned long long offset = 0;
-	unsigned long long remain_data = sz;
-	unsigned long long sent_bytes = 0;
-	unsigned long long n_send = 0;
-
-	/* Sending file data */
-	unsigned long long n_read = 0;
-	while( (n_read = read(fd, buffer, win_size)) > 0){
-		if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
-			perror("File transmission error...\n");
+		int fd = open(path, O_RDONLY);
+		if (fstat(fd, &file_stat) == -1) {
+			printf("Error: file not found\n");
+			send_tcp(socket_desc, "ERR", 3);
+			fflush(stdout);
 			return -1;
 		}
-		
-		printf("Sent %lld bytes\n\n", n_send);
-		sent_bytes += n_read;
-		printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
-		memset(buffer, 0, win_size);
-	}
+		memset(path, 0, sizeof(char)*(strlen(path)+1));
+
+		send_tcp(socket_desc, "OK", 2);
+		printf("Sent OK\n");
+		fflush(stdout);
+
+		// we need to seek till the end of the file to obtain the size, in case the file size is bigger than INT_MAX
+		FILE *fp = fdopen(fd, "r");
+		fseeko(fp, 0L, SEEK_END);
+		unsigned long long sz = ftell(fp);
+		rewind(fp);
 	
-	return 0;
+		unsigned long long filesize = htobe64(sz); // converts the byte order
+
+		printf("Size : %ld, converted : %lld\n", file_stat.st_size, filesize);
+		send_tcp(socket_desc, &filesize, sizeof(filesize));
+
+		unsigned long long offset = 0;
+		unsigned long long remain_data = sz;
+		unsigned long long sent_bytes = 0;
+		unsigned long long n_send = 0;
+
+		/* Sending file data */
+		unsigned long long n_read = 0;
+		while( (n_read = read(fd, buffer, win_size)) > 0){
+			if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
+				perror("File transmission error...\n");
+				return -1;
+			}
+		
+			printf("Sent %lld bytes\n\n", n_send);
+			sent_bytes += n_read;
+			printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
+			memset(buffer, 0, win_size);
+		}
+		close(fd);
+		return 0;
+	}
 }
 
 //used to download a file
@@ -102,59 +114,67 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	strncpy(temp_path, path, strlen(path));
 	strncat(temp_path, "__temp", strlen("__temp"));
 
-	int fd = open(temp_path, O_CREAT|O_RDWR|O_TRUNC, 0777);
-	if (fd == -1) {
-		perror("Unable to create file\n");
-		return -1;
-	}
+	sleep(5);
+	if( access( temp_path, F_OK ) != -1 ) {
+    	send_tcp(socket_desc, "WAIT", 4);
+		printf("File already in uploading by an other user, please wait and retry\n");
+	} else {
+		send_tcp(socket_desc, "OK", 4);
 
-	recv_tcp(socket_desc, buffer, 3);
-	if(strcmp(buffer, "ERR") == 0) {
-		printf("Cannot retrieve file...\n");
-		if (remove(temp_path) == 0) 
-      		printf("File successfully deleted\n"); 
-   		else
-      		perror("Unable to delete the file"); 
-		return -1;
-	}
-
-	memset(buffer, 0, win_size);
-
-	//receive and parse the file size
-	unsigned long long filesize;
-	recv_tcp(socket_desc, &filesize, sizeof(filesize));
-	filesize = be64toh(filesize);
-
-	printf("File size is: %lld\n", filesize);
-
-	unsigned long long tot_bytes_recvd = 0;
-	unsigned long long bytes_recvd = 0;
-	unsigned long long bytes_wrttn = 0;
-	unsigned long long tot_bytes_wr = 0;
-	unsigned long long recv_bytes_buffer = win_size < filesize ? win_size : filesize;
-
-	// read until all the bytes are received
-	while(tot_bytes_wr < filesize ){
-		if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
-			fprintf(stderr, "\nRetrieveFile: %s\n", strerror(errno));
+    	int fd = open(temp_path, O_CREAT|O_RDWR|O_TRUNC, 0777);
+		if (fd == -1) {
+			perror("Unable to create file\n");
 			return -1;
 		}
-		tot_bytes_recvd += bytes_recvd;
-		printf("Received %lld new bytes...\n", bytes_recvd);
-		if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
-			perror("File transmission error...\n");
+
+		recv_tcp(socket_desc, buffer, 3);
+		if(strcmp(buffer, "ERR") == 0) {
+			printf("Cannot retrieve file...\n");
+			if (remove(temp_path) == 0) 
+      			printf("File successfully deleted\n"); 
+   			else
+      			perror("Unable to delete the file"); 
 			return -1;
 		}
-		tot_bytes_wr += bytes_wrttn;
-		printf("%lld / %lld bytes written...\n", tot_bytes_wr, filesize);
+
 		memset(buffer, 0, win_size);
-		recv_bytes_buffer = (filesize - tot_bytes_recvd) < win_size ? (filesize - tot_bytes_recvd) : win_size;
+
+		//receive and parse the file size
+		unsigned long long filesize;
+		recv_tcp(socket_desc, &filesize, sizeof(filesize));
+		filesize = be64toh(filesize);
+
+		printf("File size is: %lld\n", filesize);
+
+		unsigned long long tot_bytes_recvd = 0;
+		unsigned long long bytes_recvd = 0;
+		unsigned long long bytes_wrttn = 0;
+		unsigned long long tot_bytes_wr = 0;
+		unsigned long long recv_bytes_buffer = win_size < filesize ? win_size : filesize;
+
+		// read until all the bytes are received
+		while(tot_bytes_wr < filesize ){
+			if ( (bytes_recvd = recv_tcp(socket_desc, buffer, recv_bytes_buffer)) < 0){
+				fprintf(stderr, "\nRetrieveFile: %s\n", strerror(errno));
+				return -1;
+			}
+			tot_bytes_recvd += bytes_recvd;
+			printf("Received %lld new bytes...\n", bytes_recvd);
+			if( (bytes_wrttn = write(fd, buffer, bytes_recvd)) < 0){
+				perror("File transmission error...\n");
+				return -1;
+			}
+			tot_bytes_wr += bytes_wrttn;
+			printf("%lld / %lld bytes written...\n", tot_bytes_wr, filesize);
+			memset(buffer, 0, win_size);
+			recv_bytes_buffer = (filesize - tot_bytes_recvd) < win_size ? (filesize - tot_bytes_recvd) : win_size;
+		}
+		close(fd);
+		rename(temp_path, path);
+		printf("File transfer complete!\n");
 	}
-	close(fd);
-	rename(temp_path, path);
 	memset(path, 0, sizeof(char)*(strlen(path)+1));
 	memset(temp_path, 0, sizeof(char)*(strlen(temp_path)+1));
-	printf("File transfer complete!\n");
 	return 0;		
 }
 

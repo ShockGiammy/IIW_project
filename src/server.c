@@ -145,8 +145,6 @@ void *evadi_richiesta(void *socket_desc) {
 
 				/*command GET*/
 				if(strcmp(client_request, "get") == 0) {
-					printf("command GET entered\n");
-					fflush(stdout);
 					if (SendFile(socket, filesName, path) == 0) {
 						printf("file transfer completed\n");
 					}
@@ -157,8 +155,6 @@ void *evadi_richiesta(void *socket_desc) {
 
 				/*command PUT*/
 				else if(strcmp(client_request, "put") == 0) {
-					printf("command PUT entered\n");
-					fflush(stdout);
 					char *resp = "rcvd fn";
 					send_tcp(socket, resp, strlen(resp)+1);
 
