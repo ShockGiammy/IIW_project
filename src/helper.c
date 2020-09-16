@@ -131,7 +131,6 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	strncpy(temp_path, path, strlen(path));
 	strncat(temp_path, "__temp", sizeof("__temp"));
 
-	//sleep(5);
 	if( access( temp_path, F_OK ) != -1 ) {
     	send_tcp(socket_desc, "WAIT", 4);
 		printf("File already in uploading by another user, please wait and retry\n");
