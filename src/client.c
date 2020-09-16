@@ -204,8 +204,18 @@ int main(int argc, char *argv[]) {
 						exit(EXIT_FAILURE);
 					}
 
+					char response[9];
+					n = recv_tcp(conn_s, response, 9);
+					if( n < 0 ){
+						perror("Send error...\n");
+						exit(EXIT_FAILURE);
+					} else if(strcmp(response, "recvd fn")!=0){
+						perror("Server did not receive filoname properly\n");
+						continue;
+					}
+
 					if(strcmp(command, "get") == 0) {
-						if( RetrieveFile(conn_s, fname, path, true) < 0 ){
+						if( RetrieveFile(conn_s, fname, path) < 0 ){
 							fprintf(stderr, "RetrieveFile: error...\n");
 						}
 					}

@@ -103,7 +103,7 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 }
 
 //used to download a file
-int RetrieveFile(int socket_desc, char* fname, char *directory_path, bool is_client) {
+int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	int win_size = get_win_size();
 	char buffer[win_size];
 	memset(buffer, 0, win_size);
@@ -119,11 +119,11 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path, bool is_cli
 	strncat(temp_path, "__temp", sizeof("__temp"));
 
 	//sleep(5);
-	if( !is_client && access( temp_path, F_OK ) != -1 ) {
+	if( access( temp_path, F_OK ) != -1 ) {
     	send_tcp(socket_desc, "WAIT", 4);
-		printf("File already in uploading by an other user, please wait and retry\n");
+		printf("File already in uploading by another user, please wait and retry\n");
 	} else {
-		send_tcp(socket_desc, "OK", 4);
+			send_tcp(socket_desc, "OK", 4);
 
     	int fd = open(temp_path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 		if (fd == -1) {

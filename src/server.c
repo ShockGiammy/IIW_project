@@ -141,6 +141,13 @@ void *evadi_richiesta(void *socket_desc) {
 				printf("File name is not valid\n");
 			}
 			else {
+				n = send_tcp(socket, "recvd fn", 9);
+				if( n < 0 ){
+					printf("recv_tcp error, abort...\n");
+					int ret = -1;
+					pthread_exit(&ret);
+				}
+
 				printf("file name is %s\n", filesName);
 
 				/*command GET*/
@@ -158,7 +165,7 @@ void *evadi_richiesta(void *socket_desc) {
 					char *resp = "rcvd fn";
 					send_tcp(socket, resp, strlen(resp)+1);
 
-					if(RetrieveFile(socket, filesName, path, false) < 0){
+					if(RetrieveFile(socket, filesName, path) < 0){
 						fprintf(stderr, "RetrieveFile: error...\n");
 					}
 				}
