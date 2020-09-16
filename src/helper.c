@@ -43,7 +43,6 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	else {
 		memset(buffer, 0, win_size);
 
-	
 		char path[100];
 		memset(path, 0, 100);
 		strncpy(path, directory_path, strlen(directory_path));
@@ -83,30 +82,22 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 
 		/* Sending file data */
 		unsigned long long n_read = 0;
-		printf("File transmission started\n");
-		while(true){
-			if((n_read = read(fd, buffer, win_size)) > 0){
-				if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
-					perror("File transmission error...\n");
-					return -1;
-				}
+		while((n_read = read(fd, buffer, win_size)) > 0){
+			if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
+				perror("File transmission error...\n");
+				return -1;
+			}
 			
-				printf("Sent %lld bytes\n\n", n_send);
-				sent_bytes += n_read;
-				printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
-				memset(buffer, 0, win_size);
-			}
-			else if(n_read == 0){
-				printf("No more bytes to read\n");
-				break;
-			}
-			else{
+			printf("Sent %lld bytes\n\n", n_send);
+			sent_bytes += n_read;
+			printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
+			memset(buffer, 0, win_size);
+			if (n_read < 0) {
 				perror("read error\n");
 				return -1;
 			}
 		}
 		close(fd);
-		printf("File transmission ended\n");
 		return 0;
 	}
 }
@@ -127,7 +118,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path, bool is_cli
 	strncpy(temp_path, path, strlen(path));
 	strncat(temp_path, "__temp", sizeof("__temp"));
 
-	sleep(5);
+	//sleep(5);
 	if( !is_client && access( temp_path, F_OK ) != -1 ) {
     	send_tcp(socket_desc, "WAIT", 4);
 		printf("File already in uploading by an other user, please wait and retry\n");
@@ -158,6 +149,7 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path, bool is_cli
 		filesize = be64toh(filesize);
 
 		printf("File size is: %lld\n", filesize);
+		fflush(stdout);
 
 		unsigned long long tot_bytes_recvd = 0;
 		unsigned long long bytes_recvd = 0;
