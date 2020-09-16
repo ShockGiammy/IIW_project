@@ -43,14 +43,15 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 	else {
 		memset(buffer, 0, win_size);
 
-		// opens the file using the right path
-		printf("opening file\n");
 	
 		char path[100];
 		memset(path, 0, 100);
 		strncpy(path, directory_path, strlen(directory_path));
 		strncat(path, file_name, strlen(file_name));
 
+		// opens the file using the right path
+		printf("opening file, path: %s\n", path);
+		
 		int fd = open(path, O_RDONLY);
 		if (fstat(fd, &file_stat) == -1) {
 			printf("Error: file not found\n");
@@ -82,24 +83,36 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 
 		/* Sending file data */
 		unsigned long long n_read = 0;
-		while( (n_read = read(fd, buffer, win_size)) > 0){
-			if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
-				perror("File transmission error...\n");
+		printf("File transmission started\n");
+		while(true){
+			if((n_read = read(fd, buffer, win_size)) > 0){
+				if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
+					perror("File transmission error...\n");
+					return -1;
+				}
+			
+				printf("Sent %lld bytes\n\n", n_send);
+				sent_bytes += n_read;
+				printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
+				memset(buffer, 0, win_size);
+			}
+			else if(n_read == 0){
+				printf("No more bytes to read\n");
+				break;
+			}
+			else{
+				perror("read error\n");
 				return -1;
 			}
-		
-			printf("Sent %lld bytes\n\n", n_send);
-			sent_bytes += n_read;
-			printf("%lld / %lld sent...\n\n", sent_bytes, remain_data);
-			memset(buffer, 0, win_size);
 		}
 		close(fd);
+		printf("File transmission ended\n");
 		return 0;
 	}
 }
 
 //used to download a file
-int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
+int RetrieveFile(int socket_desc, char* fname, char *directory_path, bool is_client) {
 	int win_size = get_win_size();
 	char buffer[win_size];
 	memset(buffer, 0, win_size);
@@ -112,10 +125,10 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	char temp_path[100];
 	memset(temp_path, 0, 100);
 	strncpy(temp_path, path, strlen(path));
-	strncat(temp_path, "__temp", strlen("__temp"));
+	strncat(temp_path, "__temp", sizeof("__temp"));
 
 	sleep(5);
-	if( access( temp_path, F_OK ) != -1 ) {
+	if( !is_client && access( temp_path, F_OK ) != -1 ) {
     	send_tcp(socket_desc, "WAIT", 4);
 		printf("File already in uploading by an other user, please wait and retry\n");
 	} else {

@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
 				memset(files, 0, sizeof(char)*(strlen(files)+1));
 			}
 
-			/*command GET*/
+			/*command GET and PUT*/
 			else if(strcmp(command,"get") == 0 || strcmp(command,"put") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
 				
 				if (strstr(fname, "__temp") != NULL) {
 					n = send_tcp(conn_s, "invalid", strlen("invalid"));
-					printf("Please remove '__temp' from file name and retry...\n");
+					printf("Cannot use '__temp' files...\n");
 				}
 				else {
 					n = send_tcp(conn_s, fname, strlen(fname));
@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
 					}
 
 					if(strcmp(command, "get") == 0) {
-						if( RetrieveFile(conn_s, fname, path) < 0 ){
+						if( RetrieveFile(conn_s, fname, path, true) < 0 ){
 							fprintf(stderr, "RetrieveFile: error...\n");
 						}
 					}

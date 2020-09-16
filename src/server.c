@@ -133,7 +133,7 @@ void *evadi_richiesta(void *socket_desc) {
 			
 			int n = recv_tcp(socket, filesName, 50);
 			if( n < 0 ){
-				printf("Invalid filename, abort...\n");
+				printf("recv_tcp error, abort...\n");
 				int ret = -1;
 				pthread_exit(&ret);
 			}
@@ -158,7 +158,7 @@ void *evadi_richiesta(void *socket_desc) {
 					char *resp = "rcvd fn";
 					send_tcp(socket, resp, strlen(resp)+1);
 
-					if(RetrieveFile(socket, filesName, path) < 0){
+					if(RetrieveFile(socket, filesName, path, false) < 0){
 						fprintf(stderr, "RetrieveFile: error...\n");
 					}
 				}
