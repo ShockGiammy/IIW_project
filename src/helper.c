@@ -97,7 +97,12 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	strncpy(path, directory_path, strlen(directory_path));
 	strncat(path, fname, strlen(fname));
 
-	int fd = open(path, O_CREAT|O_RDWR|O_TRUNC, 0777);
+	char temp_path[100];
+	memset(temp_path, 0, 100);
+	strncpy(temp_path, path, strlen(path));
+	strncat(temp_path, "__temp", strlen("__temp"));
+
+	int fd = open(temp_path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 	if (fd == -1) {
 		perror("Unable to create file\n");
 		return -1;
@@ -106,13 +111,12 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	recv_tcp(socket_desc, buffer, 3);
 	if(strcmp(buffer, "ERR") == 0) {
 		printf("Cannot retrieve file...\n");
-		if (remove(path) == 0) 
+		if (remove(temp_path) == 0) 
       		printf("File successfully deleted\n"); 
    		else
       		perror("Unable to delete the file"); 
 		return -1;
 	}
-	memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 	memset(buffer, 0, win_size);
 
@@ -147,6 +151,9 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 		recv_bytes_buffer = (filesize - tot_bytes_recvd) < win_size ? (filesize - tot_bytes_recvd) : win_size;
 	}
 	close(fd);
+	rename(temp_path, path);
+	memset(path, 0, sizeof(char)*(strlen(path)+1));
+	memset(temp_path, 0, sizeof(char)*(strlen(temp_path)+1));
 	printf("File transfer complete!\n");
 	return 0;		
 }

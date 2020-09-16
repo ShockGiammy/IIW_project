@@ -104,7 +104,7 @@ void *evadi_richiesta(void *socket_desc) {
 			int len_filename = 50;
 			DIR *new_dr = opendir(path);
 			while ((de = readdir(new_dr)) != NULL){
-				if(strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
+				if(strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0 && strstr(de->d_name, "__temp") == NULL) {
     	        	char string[len_filename];
 					memset(string, 0, len_filename);
         	    	strncpy(string, de->d_name, len_filename - 2);
@@ -137,25 +137,34 @@ void *evadi_richiesta(void *socket_desc) {
 				int ret = -1;
 				pthread_exit(&ret);
 			}
-			printf("file name is %s\n", filesName);
-
-			/*command GET*/
-			if(strcmp(client_request, "get") == 0) {
-				if (SendFile(socket, filesName, path) == 0) {
-					printf("file transfer completed\n");
-				}
-				else {
-					printf("file transfer error\n");
-				}
+			if (strcmp(filesName, "invalid") == 0) {
+				printf("File name is not valid\n");
 			}
+			else {
+				printf("file name is %s\n", filesName);
 
-			/*command PUT*/
-			else if(strcmp(client_request, "put") == 0) {
-				char *resp = "rcvd fn";
-				send_tcp(socket, resp, strlen(resp)+1);
+				/*command GET*/
+				if(strcmp(client_request, "get") == 0) {
+					printf("command GET entered\n");
+					fflush(stdout);
+					if (SendFile(socket, filesName, path) == 0) {
+						printf("file transfer completed\n");
+					}
+					else {
+						printf("file transfer error\n");
+					}
+				}
 
-				if(RetrieveFile(socket, filesName, path) < 0){
-					fprintf(stderr, "RetrieveFile: error...\n");
+				/*command PUT*/
+				else if(strcmp(client_request, "put") == 0) {
+					printf("command PUT entered\n");
+					fflush(stdout);
+					char *resp = "rcvd fn";
+					send_tcp(socket, resp, strlen(resp)+1);
+
+					if(RetrieveFile(socket, filesName, path) < 0){
+						fprintf(stderr, "RetrieveFile: error...\n");
+					}
 				}
 			}
 		}
