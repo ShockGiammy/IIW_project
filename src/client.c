@@ -210,7 +210,10 @@ int main(int argc, char *argv[]) {
 						perror("Send error...\n");
 						exit(EXIT_FAILURE);
 					} else if(strcmp(response, "recvd fn")!=0){
-						perror("Server did not receive filoname properly\n");
+						perror("Server did not receive filename properly\n");
+						continue;
+					} else if(strcmp(response, "ERR")==0){
+						perror("Server side error, file not found...\n");
 						continue;
 					}
 
