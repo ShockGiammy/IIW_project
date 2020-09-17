@@ -625,19 +625,22 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo; // the tcp timeout will be kept in this struct
 	memset(&send_timeo, 0, sizeof(send_timeo));
-	send_timeo.time.tv_sec = TIME_START_SEC; // we set the first timeout to 3sec, as it's in TCP standard
-	send_timeo.time.tv_usec = TIME_START_USEC;
-
-	#ifdef TCP_TO
-		// useful to get strat time and end time
-		struct timeval start_rtt;
-		struct timeval finish_rtt;
-	#endif
+	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_usec = 0;
 
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 		fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
 		return -1;
 	}
+
+	#ifdef TCP_TO
+		// useful to get strat time and end time
+		struct timeval start_rtt;
+		struct timeval finish_rtt;
+	#else
+		send_timeo.time.tv_sec = TIME_START_SEC;
+		send_timeo.time.tv_usec = TIME_START_USEC;
+	#endif
 
 	int index = 0; // sender segments list index
 
@@ -672,7 +675,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		
 		// we can try to send bytes, there is still data to send
         // need to check if receiver can still receive data
-		if((bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size)) {
+		if(bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size) {
 
 			fd_set set_sock_send = { 0 };
 			FD_ZERO(&set_sock_send);
@@ -728,7 +731,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 					#endif
 				}
 			}
-
 		}
 
 		#ifdef ACTIVE_LOG
@@ -755,92 +757,92 @@ int send_tcp(int sockd, void* buf, size_t size){
 			}
 
 			if(FD_ISSET(sockd, &set_sock_recv)) { //we expect a buffer with only header and no data
-					memset(recv_ack_buf, 0, HEAD_SIZE);
+				memset(recv_ack_buf, 0, HEAD_SIZE);
 
-					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
-					
-					#ifdef TCP_TO
-						// acquire the time to estimate the rtt
-						gettimeofday(&finish_rtt, NULL);
-						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+				recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
+				
+				#ifdef TCP_TO
+					// acquire the time to estimate the rtt
+					gettimeofday(&finish_rtt, NULL);
+					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
 
+				#endif
+
+				//sets the new timeout 
+				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+					return -1;
+				}
+				
+				//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
+				memset(&recv_segm, 0, sizeof(recv_segm));
+				ret = extract_segment(&recv_segm, recv_ack_buf);
+				memset(recv_ack_buf, 0, HEAD_SIZE);
+
+				if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
+					close_receiver_tcp(sockd);
+				}
+
+				#ifdef ACTIVE_LOG
+					snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
+							sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+					print_on_log(fd, msg);
+					memset(msg, 0, LOG_MSG_SIZE);
+				#endif
+
+				// check if it is a duplicate ack
+				if(recv_segm.ack_number == sender_wind.next_to_ack) {
+					#ifdef ACTIVE_LOG
+						snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
+						print_on_log(fd, msg);
+						memset(msg, 0, LOG_MSG_SIZE);
 					#endif
 
-					//sets the new timeout 
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
-					}
-					
-					//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
-					memset(&recv_segm, 0, sizeof(recv_segm));
-					ret = extract_segment(&recv_segm, recv_ack_buf);
-						memset(recv_ack_buf, 0, HEAD_SIZE);
+					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
 
-						if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
-							close_receiver_tcp(sockd);
-						}
+					/*to update the congetion window*/
+					congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
+
+					//fast retransmission
+					if(sender_wind.dupl_ack == 3) {
+						times_retx++;
 
 						#ifdef ACTIVE_LOG
-							snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
-									sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+							snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
 							print_on_log(fd, msg);
 							memset(msg, 0, LOG_MSG_SIZE);
 						#endif
 
-						// check if it is a duplicate ack
-						if(recv_segm.ack_number == sender_wind.next_to_ack) {
-							#ifdef ACTIVE_LOG
-								snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
-								print_on_log(fd, msg);
-								memset(msg, 0, LOG_MSG_SIZE);
-							#endif
+						/*to update the congetion window*/
+						congestion_control_duplicateAck(sender_wind);
+						check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-							sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+						retx(send_segm, sender_wind, send_buf, sockd);
+						#ifdef TCP_TO
+							gettimeofday(&start_rtt, NULL);
+						#endif
+					}
+				}
 
-							/*to update the congetion window*/
-							congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
-							check_size_buffer(sender_wind, recv_segm.receiver_window);
+				// the segment contains a new ack, unpack it and slide the window
+				else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
+					// printf("Ack OK. Sliding the window...\n");
+					int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
+					if(bytes_acked < 0){
+						fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
+						return -1;
+					}
+					sender_wind.bytes_acked_current_transmission += bytes_acked;
 
-							//fast retransmission
-							if(sender_wind.dupl_ack == 3) {
-								times_retx++;
+					/*to update the congetion window*/
+					congestion_control_receiveAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-								#ifdef ACTIVE_LOG
-									snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
-									print_on_log(fd, msg);
-									memset(msg, 0, LOG_MSG_SIZE);
-								#endif
+					slide_window(&sender_wind, &recv_segm, send_segm);
 
-								/*to update the congetion window*/
-								congestion_control_duplicateAck(sender_wind);
-								check_size_buffer(sender_wind, recv_segm.receiver_window);
-
-								retx(send_segm, sender_wind, send_buf, sockd);
-								#ifdef TCP_TO
-									gettimeofday(&start_rtt, NULL);
-								#endif
-							}
-						}
-
-						// the segment contains a new ack, unpack it and slide the window
-						else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
-							// printf("Ack OK. Sliding the window...\n");
-							int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
-							if(bytes_acked < 0){
-								fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
-								return -1;
-							}
-							sender_wind.bytes_acked_current_transmission += bytes_acked;
-
-							/*to update the congetion window*/
-							congestion_control_receiveAck(sender_wind);
-							check_size_buffer(sender_wind, recv_segm.receiver_window);
-
-							slide_window(&sender_wind, &recv_segm, send_segm);
-
-							times_retx = 0;
-						}
+					times_retx = 0;
+				}
 			}
 			// we have to retx the last segment not acked due to TO
 			else {
@@ -1772,4 +1774,9 @@ void init_log(char* part_filename){
 	strcat(log_filename, "txt");
 
 	fd = create_log_file(log_filename);
+	#ifdef TCP_TO
+		char msg[256];
+		snprintf(msg, 256, "Using adaptive TO\n");
+		print_on_log(fd, msg);
+	#endif
 }

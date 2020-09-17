@@ -24,7 +24,7 @@
 #define MAX_BUF_SIZE      100
 #define MAX_LINE          4096
 #define MAX_LINE_DECOR    30
-#define MAX_ATTMPTS_RETX  10
+#define MAX_ATTMPTS_RETX  100
 #define MAX_ATTMPTS_CLOSE 5
 #define RECV_TIMEOUT_SEC  1 << 11
 #define RECV_TIMEOUT_SHORT_SEC 1
@@ -33,10 +33,10 @@
 #define MAX_ATTMPTS_PORT_SEARCH 3
 #define MAX_BIND_ATTMPTS 2
 #define PROCESSES 10
-#define TIME_START_SEC 1
-#define TIME_START_USEC 0
+#define TIME_START_SEC 0
+#define TIME_START_USEC 10000
 
-#undef ACTIVE_LOG
+#define ACTIVE_LOG
 #undef TCP_TO
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
