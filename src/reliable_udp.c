@@ -764,12 +764,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 						gettimeofday(&finish_rtt, NULL);
 						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
 
-						//sets the new timeout 
-						if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-							fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-							return -1;
-						}
 					#endif
+
+					//sets the new timeout 
+					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+						return -1;
+					}
 					
 					//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 					memset(&recv_segm, 0, sizeof(recv_segm));
@@ -843,20 +844,17 @@ int send_tcp(int sockd, void* buf, size_t size){
 			}
 			// we have to retx the last segment not acked due to TO
 			else {
-				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-					return -1;
-				}
+
 				#ifdef TCP_TO
 					// estimates the timeout and sets the new values
 					gettimeofday(&finish_rtt, NULL);
 					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
-					}
 				#endif
+
+				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+					return -1;
+				}
 
 				times_retx++;
 				
