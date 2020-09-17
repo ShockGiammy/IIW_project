@@ -274,22 +274,6 @@ int main(int argc, char *argv[]) {
     }
 
     /*  Enter an infinite loop to respond to client requests  */
-    
-	/* Il semaforo ha due token : visto l'accesso concorrente di molti client,il secondo token 
-	serve per segnalare al thread evadi_richiesta che l'utente è stato aggiunto alla chat corretta */
-	gen_id = semget(IPC_PRIVATE,2, IPC_CREAT | 0666);
-	if(gen_id == -1) {
-		printf("Error semget \n");
-		exit(-1);
-	}
-	if(semctl(gen_id,0,SETVAL,1) == -1) {
-		printf("Error semctl \n");
-		exit(-1);
-	}
-	if(semctl(gen_id,1,SETVAL,0) == -1) {
-		printf("Error on second token in semctl \n");
-		exit(-1);
-	}
 
 	fd_set rset;
 	int process_to_wake_up = 0;

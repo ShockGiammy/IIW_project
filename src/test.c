@@ -131,8 +131,19 @@ int main(int argc, char *argv[]) {
 			perror("Send error...\n");
 			exit(EXIT_FAILURE);
 		}
+		char serv_response[9];
+		n = recv_tcp(conn_s, serv_response, 9);
+		if( n < 0 ){
+			perror("Send error...\n");
+			exit(EXIT_FAILURE);
+		} else if(strcmp(serv_response, "recvd fn")!=0){
+			perror("Server did not receive filename properly\n");
+			continue;
+		} else if(strcmp(serv_response, "ERR")==0){
+			perror("Server side error, file not found...\n");
+			continue;
+		}
 
-		//sleep(1);
         gettimeofday(&start, NULL);
 		if(strcmp(argv[4], "get") == 0) { 
 			if( RetrieveFile(conn_s, argv[3], path) < 0 ){
@@ -156,9 +167,7 @@ int main(int argc, char *argv[]) {
         gettimeofday(&end, NULL);
 		set_test_values(&times[i], start, end);
         i++;
-		//win_size += 10000;
-		//sleep(3);
-	}while(i < 5);
+	}while(i < 3);
 	
 	// computes the average time and saves the result no the file
 	calc_avg_times(&test_result, times);
@@ -181,7 +190,7 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
 
-	for(int i = 0; i < 5; i++) {
+	for(int i = 0; i < 3; i++) {
 		avg_secs += times[i].tv_sec;
 		avg_usecs += times[i].tv_usec;
 	}
