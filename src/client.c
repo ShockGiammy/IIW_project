@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
 				memset(files, 0, sizeof(char)*(strlen(files)+1));
 			}
 
-			/*command GET*/
+			/*command GET and PUT*/
 			else if(strcmp(command,"get") == 0 || strcmp(command,"put") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
 				
 				if (strstr(fname, "__temp") != NULL) {
 					n = send_tcp(conn_s, "invalid", strlen("invalid"));
-					printf("Please remove '__temp' from file name and retry...\n");
+					printf("Cannot use '__temp' files...\n");
 				}
 				else {
 					n = send_tcp(conn_s, fname, strlen(fname));
@@ -202,6 +202,19 @@ int main(int argc, char *argv[]) {
 					if( n < 0 ){
 						perror("Send error...\n");
 						exit(EXIT_FAILURE);
+					}
+
+					char response[9];
+					n = recv_tcp(conn_s, response, 9);
+					if( n < 0 ){
+						perror("Send error...\n");
+						exit(EXIT_FAILURE);
+					} else if(strcmp(response, "recvd fn")!=0){
+						perror("Server did not receive filename properly\n");
+						continue;
+					} else if(strcmp(response, "ERR")==0){
+						perror("Server side error, file not found...\n");
+						continue;
 					}
 
 					if(strcmp(command, "get") == 0) {
@@ -212,13 +225,6 @@ int main(int argc, char *argv[]) {
 
 					/*command PUT*/
 					else if(strcmp(command, "put") == 0) {
-						memset(response, 0, sizeof(char)*(strlen(response)+1));
-						n = recv_tcp(conn_s, server_response, BUFSIZ);
-						if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-							fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
-							exit(EXIT_FAILURE);
-						}
-
 						if (SendFile(conn_s, fname, path) == 0) {
 							printf("file transfer completed \n");
 						}

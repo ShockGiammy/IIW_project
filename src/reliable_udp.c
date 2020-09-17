@@ -96,18 +96,6 @@ int make_seg(tcp segment, char *send_segm) {
 	send_segm_char += segment.data_length;
 	bytes_written += segment.data_length;
 
-	/*unsigned short int *send_segm_short = (unsigned short int *)send_segm_char;
-	
-	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
-	*send_segm_short = htons(send_chsum);
-	//printf("chksum: %d\n", send_chsum);
-
-	bytes_written += sizeof(unsigned short int);
-	send_segm_short++;
-
-	// to see if we correctly added our checksum to the segment
-	unsigned short res_checksum = calc_checksum((unsigned short int *)send_segm, bytes_written);*/
-
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "make_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\nbytes written on send_buf: %d\n", 
 			segment.sequence_number, segment.ack_number, segment.ack, segment.syn, segment.fin, segment.data_length, bytes_written);
@@ -167,23 +155,11 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	char *recv_buf_char = (char *)recv_buf_ptr;
 	recv_buf_char += segment->data_length;
 
-	/*unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_char;
-
-	segment->checksum = ntohs(*recv_buf_short);
-	recv_buf_short = &segment->checksum;
-	bytes_recv += sizeof(unsigned short int);
-	//printf("Received checksum %d\n", segment->checksum);
-	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);*/
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 	#endif
-	/*if(recv_chsum != 0) {
-		printf("The segment has an error\n");
-		//return -1;
-	}*/
-	//recv_buf_short++;
 
 	return segment->data_length;
 }
@@ -197,39 +173,6 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 	segment->fin = is_fin;
 	segment->syn = is_syn;
 }
-
-/*unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
-	snprintf(msg, LOG_MSG_SIZE, "Calcolo il chsum per %d bytes \n", count);
-	print_on_log(fd, msg);
-	memset(msg, 0, LOG_MSG_SIZE);
-
-	//printf("Calcolo il chsum per %d bytes \n", count);
-	register unsigned long sum = 0;
-	
-	while(count > 1) {
-		sum += *segm;
-		count -= sizeof(unsigned short);
-		segm++;
-	}
-	
-	// add left-over byte if any
-	if (count > 0) {
-		sum += *(unsigned char *)segm;
-	}
-	
-	// fold 32-bit sum in 16-bit
-	while (sum >> 16) {
-		sum = (sum & 0xffff) + (sum >>16);
-		sum += (sum >>16);
-	}
-
-	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
-	snprintf(msg, LOG_MSG_SIZE, "Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
-	print_on_log(fd, msg);
-	memset(msg, 0, LOG_MSG_SIZE);
-	
-	return (unsigned short int)~sum;
-}*/
 
 void concat_segm(char *segm, char *to_concat, int max) {
 	int i;
@@ -602,23 +545,6 @@ void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, 
 	#endif
 }
 
-/* this fucntion is usefull to reorder the list in case that some segments are processed 
-and some other aren't due to they are out of order*/
-void reorder_list(tcp *segment_list, int size) {
-	int i, j;
-	for(i = 0; i < size; i++) {
-		if(segment_list[i].data == 0) {
-			j = i+1;
-			while(segment_list[j].data != 0 && j < size) {
-				segment_list[i] = segment_list[j];
-				memset(&segment_list[j], 0, sizeof(tcp));
-				i = j;
-				j++;
-			}
-		}
-	}
-}
-
 // called from the receiver to free the segments it has acked
 void free_segms_in_buff(tcp ** head, int n_free) {
 	tcp* temp;
@@ -700,10 +626,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 	time_out send_timeo; // the tcp timeout will be kept in this struct
 	memset(&send_timeo, 0, sizeof(send_timeo));
 	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_usec = 0;
 
-	// useful to get strat time and end time
-	struct timeval start_rtt;
-	struct timeval finish_rtt;
+	#ifdef TCP_TO
+		// useful to get strat time and end time
+		struct timeval start_rtt;
+		struct timeval finish_rtt;
+	#endif
 
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 		fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
@@ -794,7 +723,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 					index++;
 					index %= MAX_BUF_SIZE;
-					gettimeofday(&start_rtt, NULL);
+					#ifdef TCP_TO	
+						gettimeofday(&start_rtt, NULL);
+					#endif
 				}
 			}
 
@@ -828,15 +759,17 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
 					
-					// acquire the time to estimate the rtt
-					gettimeofday(&finish_rtt, NULL);
-					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					#ifdef TCP_TO
+						// acquire the time to estimate the rtt
+						gettimeofday(&finish_rtt, NULL);
+						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
 
-					//sets the new timeout 
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
-					}
+						//sets the new timeout 
+						if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+							fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+							return -1;
+						}
+					#endif
 					
 					//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 					memset(&recv_segm, 0, sizeof(recv_segm));
@@ -883,7 +816,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 								check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 								retx(send_segm, sender_wind, send_buf, sockd);
-								gettimeofday(&start_rtt, NULL);
+								#ifdef TCP_TO
+									gettimeofday(&start_rtt, NULL);
+								#endif
 							}
 						}
 
@@ -909,18 +844,20 @@ int send_tcp(int sockd, void* buf, size_t size){
 			// we have to retx the last segment not acked due to TO
 			else {
 
-				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-					return -1;
-				}
-				// estimates the timeout and sets the new values
-				gettimeofday(&finish_rtt, NULL);
-				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+				#ifdef TCP_TO
+					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+						return -1;
+					}
+					// estimates the timeout and sets the new values
+					gettimeofday(&finish_rtt, NULL);
+					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
 
-				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-					return -1;
-				}
+					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+						return -1;
+					}
+				#endif
 
 				times_retx++;
 				
@@ -935,7 +872,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 				check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 				retx(send_segm, sender_wind, send_buf, sockd);
-				gettimeofday(&start_rtt, NULL);
+				#ifdef TCP_TO
+					gettimeofday(&start_rtt, NULL);
+				#endif
 			}
 			memset(recv_segm.data, 0, recv_segm.data_length);
 			memset(send_buf, 0, MSS+HEAD_SIZE);
@@ -1214,7 +1153,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
 		
-		//printf("%d <= %d && %d <= %d\n", recv_win.next_to_ack, segment->sequence_number, segment->sequence_number, recv_win.last_to_ack);
 
 		// buffer segments
 		if((list_length < MAX_BUF_SIZE) && (recv_win.next_to_ack <= segment->sequence_number) 
@@ -1229,22 +1167,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			buffer_in_order(&buf_segm, segment, &recv_win, &list_length);
 		}
 
-		/*if(received_data){
-			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
-			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
-			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SHORT_USEC\n");
-				return -1;
-			}
-		}
-		else{
-			recv_timeout.tv_sec = RECV_TIMEOUT_SEC;
-			recv_timeout.tv_usec = 0;
-			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SEC\n");
-				return -1;
-			}
-		}*/
 		recv_timeout.tv_sec = 0;
 		recv_timeout.tv_usec = 500000;
 		if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
@@ -1323,9 +1245,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 					print_on_log(fd, msg);
 					memset(msg, 0, LOG_MSG_SIZE);
 				#endif
-
-				//finished = true;
-				//continue;
 			}
 			else {
 				#ifdef ACTIVE_LOG
@@ -1336,7 +1255,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			};
 		}
 		else {
-			// segment->data_length > recv_win.rcvwnd)
 			// can't receive anymore
 			finished = true;
 		}
@@ -1404,8 +1322,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 	}
-	//free_segms_in_buff(&buf_segm, list_length);
-
+	
 	//resets the time-out
 	recv_timeout.tv_sec = 0;
 	recv_timeout.tv_usec = 0;
