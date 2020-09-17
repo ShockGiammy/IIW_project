@@ -843,12 +843,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 			}
 			// we have to retx the last segment not acked due to TO
 			else {
-
+				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
+					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
+					return -1;
+				}
 				#ifdef TCP_TO
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
-					}
 					// estimates the timeout and sets the new values
 					gettimeofday(&finish_rtt, NULL);
 					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
