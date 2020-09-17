@@ -670,13 +670,15 @@ int send_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 		
-		// we can send bytes, the sending window is not full
+		// we can try to send bytes, there is still data to send
+        // need to check if receiver can still receive data
 		if((bytes_left_to_send > 0 && sender_wind.on_the_fly < sender_wind.max_size)) {
 
 			fd_set set_sock_send = { 0 };
 			FD_ZERO(&set_sock_send);
 			FD_SET(sockd, &set_sock_send);
 
+            // wait for socket to be ready for writing data
 			if( select(sockd + 1, NULL, &set_sock_send, NULL, NULL) < 0 ){
 				perror("select error\n");
 				exit(EXIT_FAILURE);
@@ -735,7 +737,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 
-		// we check if the window is full and so we see if we recevied an ack
+		// we check if we have sent the maximum allowed bytes on the fly, in that case we need to wait for an ACK
 		if(sender_wind.on_the_fly >= sender_wind.max_size || n_read >= size) {
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "send_tcp: Waiting for ack...\n");
