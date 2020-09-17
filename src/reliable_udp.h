@@ -33,9 +33,11 @@
 #define MAX_ATTMPTS_PORT_SEARCH 3
 
 #define PROCESSES 10
+#define TIME_START_SEC 1
+#define TIME_START_USEC 0
 
 #undef ACTIVE_LOG
-#define TCP_TO
+#undef TCP_TO
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 typedef struct tcp_segment

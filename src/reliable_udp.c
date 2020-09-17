@@ -625,8 +625,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo; // the tcp timeout will be kept in this struct
 	memset(&send_timeo, 0, sizeof(send_timeo));
-	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
-	send_timeo.time.tv_usec = 0;
+	send_timeo.time.tv_sec = TIME_START_SEC; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_usec = TIME_START_USEC;
 
 	#ifdef TCP_TO
 		// useful to get strat time and end time
