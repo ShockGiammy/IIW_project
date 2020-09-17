@@ -52,13 +52,13 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 		printf("opening file, path: %s\n", path);
 		
 		int fd = open(path, O_RDONLY);
+		printf("Opened fd %d\n", fd);
 		if (fstat(fd, &file_stat) == -1) {
 			printf("Error: file not found\n");
 			send_tcp(socket_desc, "ERR", 3);
 			fflush(stdout);
 			return -1;
 		}
-		memset(path, 0, sizeof(char)*(strlen(path)+1));
 
 		send_tcp(socket_desc, "OK", 2);
 		printf("Sent OK\n");
@@ -69,6 +69,10 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 		fseeko(fp, 0L, SEEK_END);
 		unsigned long long sz = ftell(fp);
 		rewind(fp);
+		
+		close(fd);
+		fd = open(path, O_RDONLY);
+		memset(path, 0, sizeof(path));
 	
 		unsigned long long filesize = htobe64(sz); // converts the byte order
 
@@ -82,7 +86,9 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 
 		/* Sending file data */
 		unsigned long long n_read = 0;
-		while((n_read = read(fd, buffer, win_size)) > 0){
+		printf("Reading from fd %d\n", fd);
+		while(sent_bytes < remain_data){
+			n_read = read(fd, buffer, win_size);
 			if ((n_send = send_tcp(socket_desc, buffer, n_read)) < 0 ){
 				perror("File transmission error...\n");
 				return -1;
@@ -96,6 +102,13 @@ int SendFile(int socket_desc, char* file_name, char *directory_path) {
 				perror("read error\n");
 				return -1;
 			}
+		}
+		if(n_read < 0){
+			perror("read error\n");
+			return -1;
+		}
+		if(sent_bytes == 0){
+			perror("Did not send any bytes...\n");
 		}
 		close(fd);
 		return 0;
@@ -118,12 +131,11 @@ int RetrieveFile(int socket_desc, char* fname, char *directory_path) {
 	strncpy(temp_path, path, strlen(path));
 	strncat(temp_path, "__temp", sizeof("__temp"));
 
-	//sleep(5);
 	if( access( temp_path, F_OK ) != -1 ) {
     	send_tcp(socket_desc, "WAIT", 4);
 		printf("File already in uploading by another user, please wait and retry\n");
 	} else {
-			send_tcp(socket_desc, "OK", 4);
+		send_tcp(socket_desc, "OK", 4);
 
     	int fd = open(temp_path, O_CREAT|O_RDWR|O_TRUNC, 0777);
 		if (fd == -1) {

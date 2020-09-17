@@ -210,7 +210,10 @@ int main(int argc, char *argv[]) {
 						perror("Send error...\n");
 						exit(EXIT_FAILURE);
 					} else if(strcmp(response, "recvd fn")!=0){
-						perror("Server did not receive filoname properly\n");
+						perror("Server did not receive filename properly\n");
+						continue;
+					} else if(strcmp(response, "ERR")==0){
+						perror("Server side error, file not found...\n");
 						continue;
 					}
 
@@ -222,13 +225,6 @@ int main(int argc, char *argv[]) {
 
 					/*command PUT*/
 					else if(strcmp(command, "put") == 0) {
-						memset(response, 0, sizeof(char)*(strlen(response)+1));
-						n = recv_tcp(conn_s, server_response, BUFSIZ);
-						if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-							fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
-							exit(EXIT_FAILURE);
-						}
-
 						if (SendFile(conn_s, fname, path) == 0) {
 							printf("file transfer completed \n");
 						}
