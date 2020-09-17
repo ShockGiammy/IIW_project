@@ -1413,9 +1413,11 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	printf("\nEnstablishing connection...\n");
 	
 	char address_string[INET_ADDRSTRLEN];
-	int tentatives = 0;
+	int bind_attmpts = 0;
 	new_sock_addr.sin_port = getpid() + 1024;
 
+	//look for a port for the current thread
+	//try to bind to the port, if unsuccessful, abort
 	for (int i = 0; i < MAX_ATTMPTS_PORT_SEARCH; i++) {
 		if (new_sock_addr.sin_port <= 65536) {
 			inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
@@ -1425,8 +1427,9 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 			int bind_value;
 			if (bind_value = bind(socket_descriptor, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
 				fprintf(stderr, "connect: bind error\n%s\n", strerror(errno));
-				tentatives++;
-				if (tentatives == 2) {
+				bind_attmpts++;
+				if (bind_attmpts == MAX_BIND_ATTMPTS) {
+					perror("Could not bind to a port...");
 					exit(EXIT_FAILURE);
 				}
     		}
@@ -1434,6 +1437,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 				break;
 			}
 		}
+		// skip 10 ports at a time so that there is 
+		// a lower probability that another process takes the same port
 		new_sock_addr.sin_port = new_sock_addr.sin_port + PROCESSES;
 	}
 
@@ -1441,45 +1446,46 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	inet_ntop(addr->sin_family, &addr->sin_addr, server_address_string, INET_ADDRSTRLEN);
 
 	printf("Connecting to %s(%d)\n", server_address_string, ntohs(addr->sin_port));
-
 	printf("Opened socket, sending Syn...\n");
 
+	// prepare SYN message
 	tcp segment;
-
 	memset(&segment, 0, sizeof(segment));
-
 	fill_struct(&segment,0, 0, win_size, 0, 0, 1);
 
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
-	
 	make_seg(segment, snd_buf);
-
 	printf("sd: %d\n", socket_descriptor);
 
 	socklen_t len = INET_ADDRSTRLEN;
+
+	// send SYN message
 	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, len) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nError while sending syn...\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
 	printf("Waiting server response...\n");
+	// wait for syn-ack with information about the new port, which is dedicated to the  to use for communication
 	if( recvfrom(socket_descriptor, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &server_addr, &len) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nrecvfrom: error\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
+	// connect to the new port allocated to this client by the server
 	if( connect(socket_descriptor, (struct sockaddr *) &server_addr, addr_len) < 0){
 		fprintf(stderr, "socket_descriptor: %d\nconnect: udp connect error\n%s\n", socket_descriptor, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
+	// extract flags and check if the message was a FIN-ACK
 	extract_segment(&head_rcv, recv_buf);
-
 	if((head_rcv.syn & head_rcv.ack) == 0){
 		perror("No SYN-ACK from the other end\n");
 		return -1;
 	}
 
+	// send ACK
 	printf("Received Syn-Ack, sending Ack...\n");
 	if( send_flags(socket_descriptor, Ack) < 0 ){
 		perror("Error while sending ack...\n");
@@ -1490,6 +1496,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 		printf("-");
 	printf("\n");
 
+	// connection enstablished
 	return 0;
 }
 
@@ -1509,12 +1516,13 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	//printf("Waiting for syn...\n");
 	socklen_t len = sizeof(client_address);
+	// wait for SYN message from client
 	if( recvfrom(sockd, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &client_address, &len) < 0 ){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
 		return -1;
 	}
 
-	// get client information
+	// get client address and port information
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(client_address.sin_family, &client_address.sin_addr, address_string, INET_ADDRSTRLEN);
 
@@ -1526,8 +1534,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	extract_segment(&head_rcv, recv_buf);
 
+	// set up a port for the client
 	int sock_conn = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP);
-	
 	int port = getpid() + 1024;
 
 	struct sockaddr_in new_sock_addr;
@@ -1557,7 +1565,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	inet_ntop(client_address.sin_family, &client_address.sin_addr, client_address_string, INET_ADDRSTRLEN);
 
 	printf("Connecting to %s(%d)\n", client_address_string, ntohs(client_address.sin_port));
-
+	
+	// connect to the client using the information from before
 	if( connect(sock_conn, (struct sockaddr*) &client_address, len) < 0){
 		perror("connect: failed to create socket with bound client address\n");
 		fprintf(stderr, "%s\n", strerror(errno));
@@ -1565,8 +1574,11 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	}
 	
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
+
+	// check the message received from the client
 	if(head_rcv.syn){
 		printf("Received Syn, sending Syn-Ack...\n");
+		// send SYN-ACK
 		send_flags(sock_conn, Syn | Ack);
 	}
 	else {
@@ -1576,10 +1588,13 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	
 	head_rcv = (const tcp) { 0 };
 	printf("Waiting for ack...\n");
-	while ( recv_tcp_segm(sock_conn, &head_rcv) <= 0 );
+	
+	// wait for ACK
+	recv_tcp_segm(sock_conn, &head_rcv);
 
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
-	
+
+	// check if message is a proper ACK
 	if(!head_rcv.ack || head_rcv.fin || head_rcv.syn){
 		perror("Missing ACK, terminating...\n");
 		return -1;
@@ -1593,16 +1608,20 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		printf("-");
 	printf("\n");
 
+	// connection enstablished
 	return sock_conn;
 }
 
+// allows to initiate a close sequence
 int close_initiator_tcp(int sockd){
 	printf("\n");
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\nConnection termination on socket %d\n", sockd);
 	
+	// there are multiple attempts
 	for(int i=0; i<MAX_ATTMPTS_CLOSE; i++){
+		// first host sends a FIN message
 		tcp temp = (const tcp) { 0 };
 		printf("Sending Fin...\n");
 		if( send_flags(sockd, Fin) < 0){
@@ -1616,6 +1635,7 @@ int close_initiator_tcp(int sockd){
 			exit(EXIT_FAILURE);
 		}
 
+		// sets a timeout so that it doesn't wait indefinitely
 		struct timeval recv_timeout;
 		recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
 		recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
@@ -1623,7 +1643,8 @@ int close_initiator_tcp(int sockd){
 			perror("setsockopt failed\n");
 			return -1;
 		}
-		
+
+		// waits for a response
 		recv_tcp_segm(sockd, &temp);
 		
 		recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
@@ -1633,6 +1654,7 @@ int close_initiator_tcp(int sockd){
 			return -1;
 		}
 
+		// checks is the message is a FIN-ACK
 		if((temp.fin && temp.ack) == 0 || (temp.syn)){
 			if(i == MAX_ATTMPTS_CLOSE)
 				perror("Missing fin-ack, could not close connection...\n");
@@ -1641,6 +1663,7 @@ int close_initiator_tcp(int sockd){
 
 		printf("Received Fin-Ack, sending Ack...\n");
 
+		// send ACK
 		if ( send_flags(sockd, Ack) < 0 ){
 			if(i == MAX_ATTMPTS_CLOSE)
 				perror("Failed to send ack, could not close connection...\n");
@@ -1656,10 +1679,13 @@ int close_initiator_tcp(int sockd){
 		printf("-");
 	printf("\n");
 	
+	// connection closed
 	return res;
 }
 
 void close_receiver_tcp(int sockd){
+
+	// a FIN message was received, so we need to reply with a FIN-ACK
 	tcp temp = (const tcp) { 0 };
 	int res = -1;
 
@@ -1685,7 +1711,10 @@ void close_receiver_tcp(int sockd){
 	FD_ZERO(&set_sock_recv);
 	FD_SET(sockd, &set_sock_recv);
 
+	// multiple attempts to close the connection
 	for(int i=0; i<MAX_ATTMPTS_CLOSE; i++){
+
+		// waits for ACK
 		if( select(sockd + 1, &set_sock_recv, NULL, NULL, &recv_timeout) < 0 ){
 			perror("select error\n");
 			exit(EXIT_FAILURE);
@@ -1704,6 +1733,7 @@ void close_receiver_tcp(int sockd){
 			perror("setsockopt failed\n");
 		}
 
+		// checks if the message is a proper ACK
 		if( !temp.ack || temp.fin || temp.syn){
 			if(i == MAX_ATTMPTS_CLOSE){
 				perror("Missing ack, could not close connection...\n");
@@ -1722,6 +1752,8 @@ void close_receiver_tcp(int sockd){
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");
+
+	// connection closed
 
 	pthread_exit(&res);
 }
