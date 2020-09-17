@@ -227,6 +227,7 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	// means that the segment is not in the list anymore
 	if(!retransmitted){
 		fprintf(stderr, "retx failed\n");
+		printf("Connection closed");
 		exit(EXIT_FAILURE);
 	}
 	// printf("\nFinished retx\n");
@@ -878,7 +879,10 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 			if(times_retx >= MAX_ATTMPTS_RETX){
 				fprintf(stderr, "send_tcp: Retransmitted %d times but did not receive any reply...\n", times_retx);
-				break;
+				send_tcp(sockd, "ERRCONG", strlen("ERRCONG"));
+				printf("Connection closed");
+				fflush(stdout);
+				exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -1128,6 +1132,12 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			free(segment);
 			memset(recv_buf, 0, MSS+HEAD_SIZE);
 			continue;
+		}
+
+		if (strcmp(segment->data, "ERRCONG") == 0) {
+			printf("Channel too congested, try again later...\n\n");
+			fflush(stdout);
+			exit(EXIT_FAILURE);
 		}
 
 		// decide how long next to will be
