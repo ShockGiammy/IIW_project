@@ -650,9 +650,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 	// we continue to send new segment / recevie acks untile we have sent and acked size bytes
 	while(bytes_left_to_send > 0 || sender_wind.bytes_acked_current_transmission < size) {
 
-		/*rtt_timeout.tv_sec = send_timeo.time.tv_sec;
-		rtt_timeout.tv_usec = send_timeo.time.tv_usec;*/
-
 		#ifdef ACTIVE_LOG
 			sprintf(msg, "Attulamente il timeout è di %ld sec e %ld usec\n", send_timeo.time.tv_sec,
 			send_timeo.time.tv_usec);
@@ -758,7 +755,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			FD_ZERO(&set_sock_recv);
 			FD_SET(sockd, &set_sock_recv);
 
-			if( select(sockd + 1, &set_sock_recv, NULL, NULL, &(rtt_timeout)) < 0 ){
+			if(select(sockd + 1, &set_sock_recv, NULL, NULL, &(rtt_timeout)) < 0 ){
 				perror("select error\n");
 				exit(EXIT_FAILURE);
 			}
@@ -767,14 +764,14 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(recv_ack_buf, 0, HEAD_SIZE);
 
 					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
+
+					rtt_timeout.tv_sec = send_timeo.time.tv_sec;
+					rtt_timeout.tv_usec = send_timeo.time.tv_usec;
 					
 					#ifdef TCP_TO
 						// acquire the time to estimate the rtt
 						gettimeofday(&finish_rtt, NULL);
 						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-						rtt_timeout.tv_sec = send_timeo.time.tv_sec;
-						rtt_timeout.tv_usec = send_timeo.time.tv_usec;
-
 					#endif
 
 					//sets the new timeout 
@@ -856,12 +853,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 			// we have to retx the last segment not acked due to TO
 			else {
 
+				rtt_timeout.tv_sec = send_timeo.time.tv_sec;
+				rtt_timeout.tv_usec = send_timeo.time.tv_usec;
+
 				#ifdef TCP_TO
 					// estimates the timeout and sets the new values
 					gettimeofday(&finish_rtt, NULL);
 					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-					rtt_timeout.tv_sec = send_timeo.time.tv_sec;
-					rtt_timeout.tv_usec = send_timeo.time.tv_usec;
 				#endif
 
 				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
@@ -892,7 +890,11 @@ int send_tcp(int sockd, void* buf, size_t size){
 			if(times_retx >= MAX_ATTMPTS_RETX){
 				fprintf(stderr, "send_tcp: Retransmitted %d times but did not receive any reply...\n", times_retx);
 				send_tcp(sockd, "ERRCONG", strlen("ERRCONG"));
-				printf("Connection closed");
+				close(sockd);
+				printf("Connection closed\n");
+				for(int i=0; i < MAX_LINE_DECOR; i++)
+					printf("-");
+				printf("\n");
 				fflush(stdout);
 				exit(EXIT_FAILURE);
 			}
@@ -906,6 +908,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 	// resets the time-out for a new client request
 	send_timeo.time.tv_sec = 0;
 	send_timeo.time.tv_usec = 0;
+	rtt_timeout.tv_sec = 0;
+	rtt_timeout.tv_usec = 0;
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 		fprintf(stderr, "Sender error setting opt(2)\n");
 	}
@@ -1149,6 +1153,11 @@ int recv_tcp(int sockd, void* buf, size_t size){
 		if (strcmp(segment->data, "ERRCONG") == 0) {
 			printf("Channel too congested, try again later...\n\n");
 			fflush(stdout);
+			close(sockd);
+			printf("Connection closed\n");
+			for(int i=0; i < MAX_LINE_DECOR; i++)
+				printf("-");
+			printf("\n");
 			exit(EXIT_FAILURE);
 		}
 
