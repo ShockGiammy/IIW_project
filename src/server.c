@@ -133,7 +133,7 @@ void *evadi_richiesta(void *socket_desc) {
 			
 			int n = recv_tcp(socket, filesName, 50);
 			if( n < 0 ){
-				printf("recv_tcp error, abort...\n");
+				printf("Invalid filename, abort...\n");
 				int ret = -1;
 				pthread_exit(&ret);
 			}
@@ -141,17 +141,12 @@ void *evadi_richiesta(void *socket_desc) {
 				printf("File name is not valid\n");
 			}
 			else {
-				n = send_tcp(socket, "recvd fn", 9);
-				if( n < 0 ){
-					printf("recv_tcp error, abort...\n");
-					int ret = -1;
-					pthread_exit(&ret);
-				}
-
 				printf("file name is %s\n", filesName);
 
 				/*command GET*/
 				if(strcmp(client_request, "get") == 0) {
+					printf("command GET entered\n");
+					fflush(stdout);
 					if (SendFile(socket, filesName, path) == 0) {
 						printf("file transfer completed\n");
 					}
@@ -159,8 +154,13 @@ void *evadi_richiesta(void *socket_desc) {
 						printf("file transfer error\n");
 					}
 				}
+
 				/*command PUT*/
 				else if(strcmp(client_request, "put") == 0) {
+					printf("command PUT entered\n");
+					fflush(stdout);
+					char *resp = "rcvd fn";
+					send_tcp(socket, resp, strlen(resp)+1);
 
 					if(RetrieveFile(socket, filesName, path) < 0){
 						fprintf(stderr, "RetrieveFile: error...\n");
@@ -273,6 +273,22 @@ int main(int argc, char *argv[]) {
     }
 
     /*  Enter an infinite loop to respond to client requests  */
+    
+	/* Il semaforo ha due token : visto l'accesso concorrente di molti client,il secondo token 
+	serve per segnalare al thread evadi_richiesta che l'utente è stato aggiunto alla chat corretta */
+	gen_id = semget(IPC_PRIVATE,2, IPC_CREAT | 0666);
+	if(gen_id == -1) {
+		printf("Error semget \n");
+		exit(-1);
+	}
+	if(semctl(gen_id,0,SETVAL,1) == -1) {
+		printf("Error semctl \n");
+		exit(-1);
+	}
+	if(semctl(gen_id,1,SETVAL,0) == -1) {
+		printf("Error on second token in semctl \n");
+		exit(-1);
+	}
 
 	fd_set rset;
 	int process_to_wake_up = 0;
