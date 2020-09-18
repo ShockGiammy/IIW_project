@@ -23,8 +23,6 @@
 #define STDIN 0
 #define COMMAND_SIZE 10
 
-#define ATTEMPTS 3
-
 char cmd[10];
 long conn_s;                /*  connection socket         */
 char *path = "test_files/";
@@ -170,7 +168,7 @@ int main(int argc, char *argv[]) {
 		set_test_values(&times[i], start, end);
         i++;
 		sleep(3);
-	}while(i < ATTEMPTS);
+	}while(i < 3);
 	
 	// computes the average time and saves the result no the file
 	calc_avg_times(&test_result, times);
@@ -193,13 +191,13 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
 
-	for(int i = 0; i < ATTEMPTS; i++) {
+	for(int i = 0; i < 3; i++) {
 		avg_secs += times[i].tv_sec;
 		avg_usecs += times[i].tv_usec;
 	}
 
-	test_result->res_time.tv_sec = avg_secs/ATTEMPTS;
-	test_result->res_time.tv_usec = avg_usecs/ATTEMPTS;
+	test_result->res_time.tv_sec = avg_secs/10;
+	test_result->res_time.tv_usec = avg_usecs/10;
 
 	while(test_result->res_time.tv_usec > 1000000) {
 		test_result->res_time.tv_sec += 1;
