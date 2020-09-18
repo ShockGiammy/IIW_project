@@ -96,18 +96,6 @@ int make_seg(tcp segment, char *send_segm) {
 	send_segm_char += segment.data_length;
 	bytes_written += segment.data_length;
 
-	/*unsigned short int *send_segm_short = (unsigned short int *)send_segm_char;
-	
-	unsigned short int send_chsum = calc_checksum((unsigned short int*)send_segm, bytes_written);
-	*send_segm_short = htons(send_chsum);
-	//printf("chksum: %d\n", send_chsum);
-
-	bytes_written += sizeof(unsigned short int);
-	send_segm_short++;
-
-	// to see if we correctly added our checksum to the segment
-	unsigned short res_checksum = calc_checksum((unsigned short int *)send_segm, bytes_written);*/
-
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "make_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\nbytes written on send_buf: %d\n", 
 			segment.sequence_number, segment.ack_number, segment.ack, segment.syn, segment.fin, segment.data_length, bytes_written);
@@ -167,23 +155,11 @@ int extract_segment(tcp *segment, char *recv_segm) {
 	char *recv_buf_char = (char *)recv_buf_ptr;
 	recv_buf_char += segment->data_length;
 
-	/*unsigned short int *recv_buf_short = (unsigned short int *)recv_buf_char;
-
-	segment->checksum = ntohs(*recv_buf_short);
-	recv_buf_short = &segment->checksum;
-	bytes_recv += sizeof(unsigned short int);
-	//printf("Received checksum %d\n", segment->checksum);
-	unsigned short int recv_chsum = calc_checksum((unsigned short int*)recv_segm, bytes_recv);*/
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "extract_segment \nseq num: %d\nack num: %d\nASF: %d%d%d\nData length: %d\n", segment->sequence_number, segment->ack_number, segment->ack, segment->syn, segment->fin, segment->data_length);
 		print_on_log(fd, msg);
 		memset(msg, 0, LOG_MSG_SIZE);
 	#endif
-	/*if(recv_chsum != 0) {
-		printf("The segment has an error\n");
-		//return -1;
-	}*/
-	//recv_buf_short++;
 
 	return segment->data_length;
 }
@@ -197,39 +173,6 @@ void fill_struct(tcp *segment, unsigned long seq_num, unsigned long ack_num, uns
 	segment->fin = is_fin;
 	segment->syn = is_syn;
 }
-
-/*unsigned short int calc_checksum(unsigned short int*segm, unsigned int count) {
-	snprintf(msg, LOG_MSG_SIZE, "Calcolo il chsum per %d bytes \n", count);
-	print_on_log(fd, msg);
-	memset(msg, 0, LOG_MSG_SIZE);
-
-	//printf("Calcolo il chsum per %d bytes \n", count);
-	register unsigned long sum = 0;
-	
-	while(count > 1) {
-		sum += *segm;
-		count -= sizeof(unsigned short);
-		segm++;
-	}
-	
-	// add left-over byte if any
-	if (count > 0) {
-		sum += *(unsigned char *)segm;
-	}
-	
-	// fold 32-bit sum in 16-bit
-	while (sum >> 16) {
-		sum = (sum & 0xffff) + (sum >>16);
-		sum += (sum >>16);
-	}
-
-	//printf("Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
-	snprintf(msg, LOG_MSG_SIZE, "Ho calcolato questo chsum %d\n", (unsigned short int)~sum);
-	print_on_log(fd, msg);
-	memset(msg, 0, LOG_MSG_SIZE);
-	
-	return (unsigned short int)~sum;
-}*/
 
 void concat_segm(char *segm, char *to_concat, int max) {
 	int i;
@@ -284,6 +227,7 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	// means that the segment is not in the list anymore
 	if(!retransmitted){
 		fprintf(stderr, "retx failed\n");
+		printf("Connection closed");
 		exit(EXIT_FAILURE);
 	}
 	// printf("\nFinished retx\n");
@@ -602,23 +546,6 @@ void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, 
 	#endif
 }
 
-/* this fucntion is usefull to reorder the list in case that some segments are processed 
-and some other aren't due to they are out of order*/
-void reorder_list(tcp *segment_list, int size) {
-	int i, j;
-	for(i = 0; i < size; i++) {
-		if(segment_list[i].data == 0) {
-			j = i+1;
-			while(segment_list[j].data != 0 && j < size) {
-				segment_list[i] = segment_list[j];
-				memset(&segment_list[j], 0, sizeof(tcp));
-				i = j;
-				j++;
-			}
-		}
-	}
-}
-
 // called from the receiver to free the segments it has acked
 void free_segms_in_buff(tcp ** head, int n_free) {
 	tcp* temp;
@@ -699,11 +626,19 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	time_out send_timeo; // the tcp timeout will be kept in this struct
 	memset(&send_timeo, 0, sizeof(send_timeo));
-	send_timeo.time.tv_sec = 3; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_sec = TIME_START_SEC; // we set the first timeout to 3sec, as it's in TCP standard
+	send_timeo.time.tv_usec = TIME_START_USEC;
 
-	// useful to get strat time and end time
-	struct timeval start_rtt;
-	struct timeval finish_rtt;
+	struct timeval rtt_timeout;
+	memset(&rtt_timeout, 0, sizeof(rtt_timeout));
+	rtt_timeout.tv_sec = send_timeo.time.tv_sec;
+	rtt_timeout.tv_usec = send_timeo.time.tv_sec;
+	
+	#ifdef TCP_TO
+		// useful to get strat time and end time
+		struct timeval start_rtt;
+		struct timeval finish_rtt;
+	#endif
 
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 		fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
@@ -794,7 +729,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 					index++;
 					index %= MAX_BUF_SIZE;
-					gettimeofday(&start_rtt, NULL);
+					#ifdef TCP_TO	
+						gettimeofday(&start_rtt, NULL);
+					#endif
 				}
 			}
 
@@ -818,7 +755,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			FD_ZERO(&set_sock_recv);
 			FD_SET(sockd, &set_sock_recv);
 
-			if( select(sockd + 1, &set_sock_recv, NULL, NULL, &(send_timeo.time)) < 0 ){
+			if(select(sockd + 1, &set_sock_recv, NULL, NULL, &(rtt_timeout)) < 0 ){
 				perror("select error\n");
 				exit(EXIT_FAILURE);
 			}
@@ -827,10 +764,15 @@ int send_tcp(int sockd, void* buf, size_t size){
 					memset(recv_ack_buf, 0, HEAD_SIZE);
 
 					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
+
+					rtt_timeout.tv_sec = send_timeo.time.tv_sec;
+					rtt_timeout.tv_usec = send_timeo.time.tv_usec;
 					
-					// acquire the time to estimate the rtt
-					gettimeofday(&finish_rtt, NULL);
-					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					#ifdef TCP_TO
+						// acquire the time to estimate the rtt
+						gettimeofday(&finish_rtt, NULL);
+						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					#endif
 
 					//sets the new timeout 
 					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
@@ -883,7 +825,9 @@ int send_tcp(int sockd, void* buf, size_t size){
 								check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 								retx(send_segm, sender_wind, send_buf, sockd);
-								gettimeofday(&start_rtt, NULL);
+								#ifdef TCP_TO
+									gettimeofday(&start_rtt, NULL);
+								#endif
 							}
 						}
 
@@ -909,13 +853,14 @@ int send_tcp(int sockd, void* buf, size_t size){
 			// we have to retx the last segment not acked due to TO
 			else {
 
-				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-					return -1;
-				}
-				// estimates the timeout and sets the new values
-				gettimeofday(&finish_rtt, NULL);
-				estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+				rtt_timeout.tv_sec = send_timeo.time.tv_sec;
+				rtt_timeout.tv_usec = send_timeo.time.tv_usec;
+
+				#ifdef TCP_TO
+					// estimates the timeout and sets the new values
+					gettimeofday(&finish_rtt, NULL);
+					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+				#endif
 
 				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
@@ -935,14 +880,23 @@ int send_tcp(int sockd, void* buf, size_t size){
 				check_size_buffer(sender_wind, recv_segm.receiver_window);
 
 				retx(send_segm, sender_wind, send_buf, sockd);
-				gettimeofday(&start_rtt, NULL);
+				#ifdef TCP_TO
+					gettimeofday(&start_rtt, NULL);
+				#endif
 			}
 			memset(recv_segm.data, 0, recv_segm.data_length);
 			memset(send_buf, 0, MSS+HEAD_SIZE);
 
 			if(times_retx >= MAX_ATTMPTS_RETX){
 				fprintf(stderr, "send_tcp: Retransmitted %d times but did not receive any reply...\n", times_retx);
-				break;
+				send_tcp(sockd, "ERRCONG", strlen("ERRCONG"));
+				close(sockd);
+				printf("Connection closed\n");
+				for(int i=0; i < MAX_LINE_DECOR; i++)
+					printf("-");
+				printf("\n");
+				fflush(stdout);
+				exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -954,6 +908,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 	// resets the time-out for a new client request
 	send_timeo.time.tv_sec = 0;
 	send_timeo.time.tv_usec = 0;
+	rtt_timeout.tv_sec = 0;
+	rtt_timeout.tv_usec = 0;
 	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
 		fprintf(stderr, "Sender error setting opt(2)\n");
 	}
@@ -1194,6 +1150,17 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			continue;
 		}
 
+		if (strcmp(segment->data, "ERRCONG") == 0) {
+			printf("Channel too congested, try again later...\n\n");
+			fflush(stdout);
+			close(sockd);
+			printf("Connection closed\n");
+			for(int i=0; i < MAX_LINE_DECOR; i++)
+				printf("-");
+			printf("\n");
+			exit(EXIT_FAILURE);
+		}
+
 		// decide how long next to will be
 		received_data = segment->data_length != 0;
 		
@@ -1214,7 +1181,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 
 		memset(recv_buf, 0, MSS+HEAD_SIZE);
 		
-		//printf("%d <= %d && %d <= %d\n", recv_win.next_to_ack, segment->sequence_number, segment->sequence_number, recv_win.last_to_ack);
 
 		// buffer segments
 		if((list_length < MAX_BUF_SIZE) && (recv_win.next_to_ack <= segment->sequence_number) 
@@ -1229,22 +1195,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			buffer_in_order(&buf_segm, segment, &recv_win, &list_length);
 		}
 
-		/*if(received_data){
-			recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
-			recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
-			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SHORT_USEC\n");
-				return -1;
-			}
-		}
-		else{
-			recv_timeout.tv_sec = RECV_TIMEOUT_SEC;
-			recv_timeout.tv_usec = 0;
-			if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
-				fprintf(stderr, "recv_tcp: Error while setting options, RECV_TIMEOUT_SEC\n");
-				return -1;
-			}
-		}*/
 		recv_timeout.tv_sec = 0;
 		recv_timeout.tv_usec = 500000;
 		if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(recv_timeout)) == -1) {
@@ -1323,9 +1273,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 					print_on_log(fd, msg);
 					memset(msg, 0, LOG_MSG_SIZE);
 				#endif
-
-				//finished = true;
-				//continue;
 			}
 			else {
 				#ifdef ACTIVE_LOG
@@ -1336,7 +1283,6 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			};
 		}
 		else {
-			// segment->data_length > recv_win.rcvwnd)
 			// can't receive anymore
 			finished = true;
 		}
@@ -1404,8 +1350,7 @@ int recv_tcp(int sockd, void* buf, size_t size){
 			memset(msg, 0, LOG_MSG_SIZE);
 		#endif
 	}
-	//free_segms_in_buff(&buf_segm, list_length);
-
+	
 	//resets the time-out
 	recv_timeout.tv_sec = 0;
 	recv_timeout.tv_usec = 0;
@@ -1499,9 +1444,11 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	printf("\nEnstablishing connection...\n");
 	
 	char address_string[INET_ADDRSTRLEN];
-	int tentatives = 0;
+	int bind_attmpts = 0;
 	new_sock_addr.sin_port = getpid() + 1024;
 
+	//look for a port for the current thread
+	//try to bind to the port, if unsuccessful, abort
 	for (int i = 0; i < MAX_ATTMPTS_PORT_SEARCH; i++) {
 		if (new_sock_addr.sin_port <= 65536) {
 			inet_ntop(new_sock_addr.sin_family, &new_sock_addr.sin_addr, address_string, INET_ADDRSTRLEN);
@@ -1511,8 +1458,9 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 			int bind_value;
 			if (bind_value = bind(socket_descriptor, (struct sockaddr *) &new_sock_addr, sizeof(new_sock_addr)) < 0 ) {
 				fprintf(stderr, "connect: bind error\n%s\n", strerror(errno));
-				tentatives++;
-				if (tentatives == 2) {
+				bind_attmpts++;
+				if (bind_attmpts == MAX_BIND_ATTMPTS) {
+					perror("Could not bind to a port...");
 					exit(EXIT_FAILURE);
 				}
     		}
@@ -1520,6 +1468,8 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 				break;
 			}
 		}
+		// skip 10 ports at a time so that there is 
+		// a lower probability that another process takes the same port
 		new_sock_addr.sin_port = new_sock_addr.sin_port + PROCESSES;
 	}
 
@@ -1527,45 +1477,46 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	inet_ntop(addr->sin_family, &addr->sin_addr, server_address_string, INET_ADDRSTRLEN);
 
 	printf("Connecting to %s(%d)\n", server_address_string, ntohs(addr->sin_port));
-
 	printf("Opened socket, sending Syn...\n");
 
+	// prepare SYN message
 	tcp segment;
-
 	memset(&segment, 0, sizeof(segment));
-
 	fill_struct(&segment,0, 0, win_size, 0, 0, 1);
 
 	printf("ASF: %d%d%d\n", segment.ack, segment.syn, segment.fin);
-	
 	make_seg(segment, snd_buf);
-
 	printf("sd: %d\n", socket_descriptor);
 
 	socklen_t len = INET_ADDRSTRLEN;
+
+	// send SYN message
 	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, len) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nError while sending syn...\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
 	printf("Waiting server response...\n");
+	// wait for syn-ack with information about the new port, which is dedicated to the  to use for communication
 	if( recvfrom(socket_descriptor, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &server_addr, &len) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nrecvfrom: error\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
+	// connect to the new port allocated to this client by the server
 	if( connect(socket_descriptor, (struct sockaddr *) &server_addr, addr_len) < 0){
 		fprintf(stderr, "socket_descriptor: %d\nconnect: udp connect error\n%s\n", socket_descriptor, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
+	// extract flags and check if the message was a FIN-ACK
 	extract_segment(&head_rcv, recv_buf);
-
 	if((head_rcv.syn & head_rcv.ack) == 0){
 		perror("No SYN-ACK from the other end\n");
 		return -1;
 	}
 
+	// send ACK
 	printf("Received Syn-Ack, sending Ack...\n");
 	if( send_flags(socket_descriptor, Ack) < 0 ){
 		perror("Error while sending ack...\n");
@@ -1576,6 +1527,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 		printf("-");
 	printf("\n");
 
+	// connection enstablished
 	return 0;
 }
 
@@ -1595,12 +1547,13 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	//printf("Waiting for syn...\n");
 	socklen_t len = sizeof(client_address);
+	// wait for SYN message from client
 	if( recvfrom(sockd, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &client_address, &len) < 0 ){
 		fprintf(stderr, "recvfrom: error\n%s\n", strerror(errno));
 		return -1;
 	}
 
-	// get client information
+	// get client address and port information
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(client_address.sin_family, &client_address.sin_addr, address_string, INET_ADDRSTRLEN);
 
@@ -1612,8 +1565,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	extract_segment(&head_rcv, recv_buf);
 
+	// set up a port for the client
 	int sock_conn = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP);
-	
 	int port = getpid() + 1024;
 
 	struct sockaddr_in new_sock_addr;
@@ -1643,7 +1596,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	inet_ntop(client_address.sin_family, &client_address.sin_addr, client_address_string, INET_ADDRSTRLEN);
 
 	printf("Connecting to %s(%d)\n", client_address_string, ntohs(client_address.sin_port));
-
+	
+	// connect to the client using the information from before
 	if( connect(sock_conn, (struct sockaddr*) &client_address, len) < 0){
 		perror("connect: failed to create socket with bound client address\n");
 		fprintf(stderr, "%s\n", strerror(errno));
@@ -1651,8 +1605,11 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	}
 	
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
+
+	// check the message received from the client
 	if(head_rcv.syn){
 		printf("Received Syn, sending Syn-Ack...\n");
+		// send SYN-ACK
 		send_flags(sock_conn, Syn | Ack);
 	}
 	else {
@@ -1662,10 +1619,13 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	
 	head_rcv = (const tcp) { 0 };
 	printf("Waiting for ack...\n");
-	while ( recv_tcp_segm(sock_conn, &head_rcv) <= 0 );
+	
+	// wait for ACK
+	recv_tcp_segm(sock_conn, &head_rcv);
 
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
-	
+
+	// check if message is a proper ACK
 	if(!head_rcv.ack || head_rcv.fin || head_rcv.syn){
 		perror("Missing ACK, terminating...\n");
 		return -1;
@@ -1679,16 +1639,20 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		printf("-");
 	printf("\n");
 
+	// connection enstablished
 	return sock_conn;
 }
 
+// allows to initiate a close sequence
 int close_initiator_tcp(int sockd){
 	printf("\n");
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\nConnection termination on socket %d\n", sockd);
 	
+	// there are multiple attempts
 	for(int i=0; i<MAX_ATTMPTS_CLOSE; i++){
+		// first host sends a FIN message
 		tcp temp = (const tcp) { 0 };
 		printf("Sending Fin...\n");
 		if( send_flags(sockd, Fin) < 0){
@@ -1702,6 +1666,7 @@ int close_initiator_tcp(int sockd){
 			exit(EXIT_FAILURE);
 		}
 
+		// sets a timeout so that it doesn't wait indefinitely
 		struct timeval recv_timeout;
 		recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
 		recv_timeout.tv_usec = RECV_TIMEOUT_SHORT_USEC;
@@ -1709,7 +1674,8 @@ int close_initiator_tcp(int sockd){
 			perror("setsockopt failed\n");
 			return -1;
 		}
-		
+
+		// waits for a response
 		recv_tcp_segm(sockd, &temp);
 		
 		recv_timeout.tv_sec = RECV_TIMEOUT_SHORT_SEC;
@@ -1719,6 +1685,7 @@ int close_initiator_tcp(int sockd){
 			return -1;
 		}
 
+		// checks is the message is a FIN-ACK
 		if((temp.fin && temp.ack) == 0 || (temp.syn)){
 			if(i == MAX_ATTMPTS_CLOSE)
 				perror("Missing fin-ack, could not close connection...\n");
@@ -1727,6 +1694,7 @@ int close_initiator_tcp(int sockd){
 
 		printf("Received Fin-Ack, sending Ack...\n");
 
+		// send ACK
 		if ( send_flags(sockd, Ack) < 0 ){
 			if(i == MAX_ATTMPTS_CLOSE)
 				perror("Failed to send ack, could not close connection...\n");
@@ -1742,10 +1710,13 @@ int close_initiator_tcp(int sockd){
 		printf("-");
 	printf("\n");
 	
+	// connection closed
 	return res;
 }
 
 void close_receiver_tcp(int sockd){
+
+	// a FIN message was received, so we need to reply with a FIN-ACK
 	tcp temp = (const tcp) { 0 };
 	int res = -1;
 
@@ -1771,7 +1742,10 @@ void close_receiver_tcp(int sockd){
 	FD_ZERO(&set_sock_recv);
 	FD_SET(sockd, &set_sock_recv);
 
+	// multiple attempts to close the connection
 	for(int i=0; i<MAX_ATTMPTS_CLOSE; i++){
+
+		// waits for ACK
 		if( select(sockd + 1, &set_sock_recv, NULL, NULL, &recv_timeout) < 0 ){
 			perror("select error\n");
 			exit(EXIT_FAILURE);
@@ -1790,6 +1764,7 @@ void close_receiver_tcp(int sockd){
 			perror("setsockopt failed\n");
 		}
 
+		// checks if the message is a proper ACK
 		if( !temp.ack || temp.fin || temp.syn){
 			if(i == MAX_ATTMPTS_CLOSE){
 				perror("Missing ack, could not close connection...\n");
@@ -1808,6 +1783,8 @@ void close_receiver_tcp(int sockd){
 	for(int i=0; i < MAX_LINE_DECOR; i++)
 		printf("-");
 	printf("\n");
+
+	// connection closed
 
 	pthread_exit(&res);
 }

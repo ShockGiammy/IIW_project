@@ -32,8 +32,10 @@
 #define RECV_TIMEOUT_SHORT_USEC 1 << 8
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 #define MAX_ATTMPTS_PORT_SEARCH 3
-
+#define MAX_BIND_ATTMPTS 2
 #define PROCESSES 10
+#define TIME_START_SEC 3
+#define TIME_START_USEC 0
 
 #undef ACTIVE_LOG
 
