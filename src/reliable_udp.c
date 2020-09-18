@@ -640,11 +640,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 		struct timeval finish_rtt;
 	#endif
 
-	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-		fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-		return -1;
-	}
-
 	int index = 0; // sender segments list index
 
 	// we continue to send new segment / recevie acks untile we have sent and acked size bytes
@@ -773,12 +768,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 					rtt_timeout.tv_sec = send_timeo.time.tv_sec;
 					rtt_timeout.tv_usec = send_timeo.time.tv_usec;
-
-					//sets the new timeout 
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
-					}
 					
 					//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
 					memset(&recv_segm, 0, sizeof(recv_segm));
@@ -862,11 +851,6 @@ int send_tcp(int sockd, void* buf, size_t size){
 				rtt_timeout.tv_sec = send_timeo.time.tv_sec;
 				rtt_timeout.tv_usec = send_timeo.time.tv_usec;
 
-				if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-					fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-					return -1;
-				}
-
 				times_retx++;
 				
 				#ifdef ACTIVE_LOG
@@ -904,15 +888,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 	snprintf(msg, LOG_MSG_SIZE, "send_tcp: %d bytes acked out of %ld bytes to send\n", sender_wind.bytes_acked_current_transmission, size);
 	print_on_log(fd, msg);
 	memset(msg, 0, LOG_MSG_SIZE);
-	
-	// resets the time-out for a new client request
-	send_timeo.time.tv_sec = 0;
-	send_timeo.time.tv_usec = 0;
-	rtt_timeout.tv_sec = 0;
-	rtt_timeout.tv_usec = 0;
-	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-		fprintf(stderr, "Sender error setting opt(2)\n");
-	}
+
 	memset(send_buf, 0, MSS+HEAD_SIZE);
 
 	#ifdef ACTIVE_LOG
