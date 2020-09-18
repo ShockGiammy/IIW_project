@@ -888,7 +888,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 			memset(send_buf, 0, MSS+HEAD_SIZE);
 
 			if(times_retx >= MAX_ATTMPTS_RETX){
-				fprintf(stderr, "send_tcp: Retransmitted %d times but did not receive any reply...\n", times_retx);
+				fprintf(stderr, "send_tcp: Retransmitted many times but did not receive any reply...\n");
 				send_tcp(sockd, "ERRCONG", strlen("ERRCONG"));
 				close(sockd);
 				printf("Connection closed\n");
