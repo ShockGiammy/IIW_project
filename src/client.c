@@ -30,7 +30,7 @@ char cmd[10];
 long conn_s;                /*  connection socket         */
 char *path = "client_files/";
 
-int ParseCmdLine(int , char **, char **);
+int ParseCmdLine(int , char **, char **, char **);
 void show_menu();
 
 void _handler(int sigo) {
@@ -43,10 +43,11 @@ void _handler(int sigo) {
 
 
 int main(int argc, char *argv[]) { 
-
-    short int port = 7000;           /*  port number, fixed        */
+    short int port;                  /*  port number               */
     struct    sockaddr_in servaddr;  /*  socket address structure  */
     char     *szAddress;             /*  Holds remote IP address   */
+    char     *szPort;                /*  Holds remote port         */
+    char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
@@ -55,13 +56,24 @@ int main(int argc, char *argv[]) {
 
 	he=NULL;
 
-	ParseCmdLine(argc, argv, &szAddress);
+	if(argc < 7) {
+		printf("Syntax: ./client -a (server ip) -p (port) loss_probability (xx.xxx...) window_size");
+		exit(EXIT_FAILURE);
+	}
+	ParseCmdLine(argc, argv, &szAddress, &szPort);
 
-	check_args(argc-1, argv, 2);
+	check_args(argc, argv, 5);
 
 	#ifdef ACTIVE_LOG
 		init_log("_client_log_");
 	#endif
+
+    /*  Set the remote port  */
+    port = strtol(szPort, &endptr, 0);
+    if ( *endptr ) {
+		printf("client: unknown port\n");
+		exit(EXIT_FAILURE);
+    }
 
     /*  Create the listening socket  */
 
@@ -246,15 +258,29 @@ void show_menu() {
 	printf("help: to show the menù\n\n");
 }
 
-int ParseCmdLine(int argc, char *argv[], char **szAddress) {
+int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort) {
     int n = 1;
 
-	if (argc != 4) {
-   		printf("Syntax:\n./client serverIP loss_probability (xx.xx..) window_size\n");
+    while ( n < argc ) {
+		if ( !strncmp(argv[n], "-a", 2) || !strncmp(argv[n], "-A", 2) ) {
+		    *szAddress = argv[++n];
+		}
+		else 
+			if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) ) {
+			    *szPort = argv[++n];
+			}
+			else
+				if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) ) {
+		    		printf("Sintassi:\n\n");
+			    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
+			    	exit(EXIT_SUCCESS);
+				}
+		++n;
+    }
+	if (argc==1) {
+   		printf("Sintassi:\n\n");
+    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
 	    exit(EXIT_SUCCESS);
 	}
-
-	*szAddress = argv[n];
-
     return 0;
 }

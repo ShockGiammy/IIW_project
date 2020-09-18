@@ -220,7 +220,8 @@ int process_manager(int list_s) {
 }
 
 int main(int argc, char *argv[]) {
-	   
+	
+	char     *endptr;                /*  for strtol()              */   
     short int port = 7000;           /*  port number, fixed        */
 	int       list_s;                /*  listening socket          */
 	pid_t pids[PROCESSES];

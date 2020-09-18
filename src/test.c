@@ -45,8 +45,8 @@ void calc_avg_times(results *test_result, struct timeval *times);
 
 
 int main(int argc, char *argv[]) {
-	if(argc != 5) {
-		printf("Syntax:\n./test loss_probability (xx.xx..) window_size filename command\n");
+	if(argc < 5) {
+		printf("Syntax: ./test loss_probability (xx.xx..) window_size filename command\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -57,8 +57,10 @@ int main(int argc, char *argv[]) {
     int i = 0;
 
     short int port = 7000;                  /*  port number               */
-    struct    sockaddr_in servaddr;  		/*  socket address structure  */
-    char     *szAddress = "127.0.0.1";      /*  Holds remote IP address   */
+    struct    sockaddr_in servaddr;  /*  socket address structure  */
+    char     *szAddress = "127.0.0.1";             /*  Holds remote IP address   */
+    char     *szPort;                /*  Holds remote port         */
+    char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
@@ -69,11 +71,12 @@ int main(int argc, char *argv[]) {
 	memset(username, 0, sizeof(username));
 
 	he=NULL;
-	check_args(argc-2, argv, 1);
+	check_args(argc, argv, 1);
 	
 	memset(&test_result, 0, sizeof(test_result));
 	get_params(&test_result.loss_prob, &test_result.win_size);
 
+	//init_log("_client_log_");
     create_file(); // initialize the file for the results
 
     /*  Create the listening socket  */
