@@ -30,7 +30,7 @@ char cmd[10];
 long conn_s;                /*  connection socket         */
 char *path = "client_files/";
 
-int ParseCmdLine(int , char **, char **, char **);
+int ParseCmdLine(int , char **, char **);
 void show_menu();
 
 void _handler(int sigo) {
@@ -43,11 +43,10 @@ void _handler(int sigo) {
 
 
 int main(int argc, char *argv[]) { 
-    short int port;                  /*  port number               */
+
+    short int port = 7000;           /*  port number, fixed        */
     struct    sockaddr_in servaddr;  /*  socket address structure  */
     char     *szAddress;             /*  Holds remote IP address   */
-    char     *szPort;                /*  Holds remote port         */
-    char     *endptr;                /*  for strtol()              */
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
@@ -56,24 +55,13 @@ int main(int argc, char *argv[]) {
 
 	he=NULL;
 
-	if(argc < 7) {
-		printf("Syntax: ./client -a (server ip) -p (port) loss_probability (xx.xxx...) window_size");
-		exit(EXIT_FAILURE);
-	}
-	ParseCmdLine(argc, argv, &szAddress, &szPort);
+	ParseCmdLine(argc, argv, &szAddress);
 
-	check_args(argc, argv, 5);
+	check_args(argc-1, argv, 2);
 
 	#ifdef ACTIVE_LOG
 		init_log("_client_log_");
 	#endif
-
-    /*  Set the remote port  */
-    port = strtol(szPort, &endptr, 0);
-    if ( *endptr ) {
-		printf("client: unknown port\n");
-		exit(EXIT_FAILURE);
-    }
 
     /*  Create the listening socket  */
 
@@ -169,7 +157,7 @@ int main(int argc, char *argv[]) {
 				memset(files, 0, sizeof(char)*(strlen(files)+1));
 			}
 
-			/*command GET*/
+			/*command GET and PUT*/
 			else if(strcmp(command,"get") == 0 || strcmp(command,"put") == 0) {
 				char response[BUFSIZ];
 				send_tcp(conn_s, command, strlen(command));
@@ -194,7 +182,7 @@ int main(int argc, char *argv[]) {
 				
 				if (strstr(fname, "__temp") != NULL) {
 					n = send_tcp(conn_s, "invalid", strlen("invalid"));
-					printf("Please remove '__temp' from file name and retry...\n");
+					printf("Cannot use '__temp' files...\n");
 				}
 				else {
 					n = send_tcp(conn_s, fname, strlen(fname));
@@ -202,6 +190,19 @@ int main(int argc, char *argv[]) {
 					if( n < 0 ){
 						perror("Send error...\n");
 						exit(EXIT_FAILURE);
+					}
+
+					char response[9];
+					n = recv_tcp(conn_s, response, 9);
+					if( n < 0 ){
+						perror("Send error...\n");
+						exit(EXIT_FAILURE);
+					} else if(strcmp(response, "recvd fn")!=0){
+						perror("Server did not receive filename properly\n");
+						continue;
+					} else if(strcmp(response, "ERR")==0){
+						perror("Server side error, file not found...\n");
+						continue;
 					}
 
 					if(strcmp(command, "get") == 0) {
@@ -212,13 +213,6 @@ int main(int argc, char *argv[]) {
 
 					/*command PUT*/
 					else if(strcmp(command, "put") == 0) {
-						memset(response, 0, sizeof(char)*(strlen(response)+1));
-						n = recv_tcp(conn_s, server_response, BUFSIZ);
-						if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-							fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
-							exit(EXIT_FAILURE);
-						}
-
 						if (SendFile(conn_s, fname, path) == 0) {
 							printf("file transfer completed \n");
 						}
@@ -258,29 +252,15 @@ void show_menu() {
 	printf("help: to show the menù\n\n");
 }
 
-int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort) {
+int ParseCmdLine(int argc, char *argv[], char **szAddress) {
     int n = 1;
 
-    while ( n < argc ) {
-		if ( !strncmp(argv[n], "-a", 2) || !strncmp(argv[n], "-A", 2) ) {
-		    *szAddress = argv[++n];
-		}
-		else 
-			if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) ) {
-			    *szPort = argv[++n];
-			}
-			else
-				if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) ) {
-		    		printf("Sintassi:\n\n");
-			    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
-			    	exit(EXIT_SUCCESS);
-				}
-		++n;
-    }
-	if (argc==1) {
-   		printf("Sintassi:\n\n");
-    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
+	if (argc != 4) {
+   		printf("Syntax:\n./client serverIP loss_probability (xx.xx..) window_size\n");
 	    exit(EXIT_SUCCESS);
 	}
+
+	*szAddress = argv[n];
+
     return 0;
 }

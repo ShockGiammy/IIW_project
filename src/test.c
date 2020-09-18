@@ -23,6 +23,8 @@
 #define STDIN 0
 #define COMMAND_SIZE 10
 
+#define ATTEMPTS 3
+
 char cmd[10];
 long conn_s;                /*  connection socket         */
 char *path = "test_files/";
@@ -43,8 +45,8 @@ void calc_avg_times(results *test_result, struct timeval *times);
 
 
 int main(int argc, char *argv[]) {
-	if(argc < 5) {
-		printf("Syntax: ./test loss_probability (xx.xx..) window_size filename command\n");
+	if(argc != 5) {
+		printf("Syntax:\n./test loss_probability (xx.xx..) window_size filename command\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -55,10 +57,8 @@ int main(int argc, char *argv[]) {
     int i = 0;
 
     short int port = 7000;                  /*  port number               */
-    struct    sockaddr_in servaddr;  /*  socket address structure  */
-    char     *szAddress = "127.0.0.1";             /*  Holds remote IP address   */
-    char     *szPort;                /*  Holds remote port         */
-    char     *endptr;                /*  for strtol()              */
+    struct    sockaddr_in servaddr;  		/*  socket address structure  */
+    char     *szAddress = "127.0.0.1";      /*  Holds remote IP address   */
 	struct	  hostent *he;
 
 	char command[COMMAND_SIZE];
@@ -69,12 +69,11 @@ int main(int argc, char *argv[]) {
 	memset(username, 0, sizeof(username));
 
 	he=NULL;
-	check_args(argc, argv, 1);
+	check_args(argc-2, argv, 1);
 	
 	memset(&test_result, 0, sizeof(test_result));
 	get_params(&test_result.loss_prob, &test_result.win_size);
 
-	//init_log("_client_log_");
     create_file(); // initialize the file for the results
 
     /*  Create the listening socket  */
@@ -168,7 +167,7 @@ int main(int argc, char *argv[]) {
 		set_test_values(&times[i], start, end);
         i++;
 		sleep(3);
-	}while(i < 3);
+	}while(i < ATTEMPTS);
 	
 	// computes the average time and saves the result no the file
 	calc_avg_times(&test_result, times);
@@ -191,13 +190,13 @@ void calc_avg_times(results *test_result, struct timeval *times) {
 	time_t avg_secs = 0;
 	suseconds_t avg_usecs = 0;
 
-	for(int i = 0; i < 3; i++) {
+	for(int i = 0; i < ATTEMPTS; i++) {
 		avg_secs += times[i].tv_sec;
 		avg_usecs += times[i].tv_usec;
 	}
 
-	test_result->res_time.tv_sec = avg_secs/10;
-	test_result->res_time.tv_usec = avg_usecs/10;
+	test_result->res_time.tv_sec = avg_secs/ATTEMPTS;
+	test_result->res_time.tv_usec = avg_usecs/ATTEMPTS;
 
 	while(test_result->res_time.tv_usec > 1000000) {
 		test_result->res_time.tv_sec += 1;

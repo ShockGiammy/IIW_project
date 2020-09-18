@@ -21,7 +21,6 @@
 #define CONG_SCALING_MSS_THRESHOLD 500
 #define HEAD_SIZE         21
 #define SOCKET_TYPE       SOCK_DGRAM
-//#define MAX_WIN           MSS * 100
 #define MAX_BUF_SIZE      100
 #define MAX_LINE          4096
 #define MAX_LINE_DECOR    30
@@ -38,6 +37,7 @@
 #define TIME_START_USEC 0
 
 #undef ACTIVE_LOG
+#define TCP_TO
 
 //this struct will be used to send / recive datas and implement the TCP reliable transimssion protocol at level 5
 typedef struct tcp_segment
@@ -46,9 +46,7 @@ typedef struct tcp_segment
   unsigned int ack_number;
   unsigned int data_length;
   unsigned int receiver_window;
-  //int checksum;
   char data[MSS];
-  //char cwr;
   bool syn;
   bool fin;
   bool ack;
@@ -81,7 +79,6 @@ typedef struct sliding_window {
   int tot_acked; // the total byte that have been acked
   int last_correctly_acked; // the last segment correctly acked, usefull for retx in case of loss / 3 dupl. ack
   int dupl_ack; // this field will keep the number of dupicate acks received for a segment
-  //int congWin;
   int rcvwnd;
   int last_byte_buffered;
   int bytes_acked_current_transmission;
@@ -123,7 +120,6 @@ void prepare_segment(tcp *segment, slid_win *wind, char *data,  int ack_num, int
 void slide_window(slid_win *wind, tcp *recv_segm, tcp *segments);
 void ack_segments(char** buf, int recv_sock,  int *list_length, tcp **buf_segm, tcp *ack,  slid_win *recv_win, int* bytes_recvd);
 int send_unreliable(int sockd, char *segm_to_go, int n_bytes);
-void reorder_list(tcp *segment_list, int size);
 void free_segms_in_buff(tcp ** head, int n_free);
 void estimate_timeout(time_out *timeo, struct timeval first_time, struct timeval last_time);
 int congestion_control_receiveAck(slid_win sender_wind);
