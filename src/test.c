@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
         gettimeofday(&end, NULL);
 		set_test_values(&times[i], start, end);
         i++;
+		sleep(3);
 	}while(i < 3);
 	
 	// computes the average time and saves the result no the file
