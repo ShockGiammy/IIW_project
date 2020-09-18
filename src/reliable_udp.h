@@ -24,7 +24,7 @@
 #define MAX_BUF_SIZE      100
 #define MAX_LINE          4096
 #define MAX_LINE_DECOR    30
-#define MAX_ATTMPTS_RETX  100
+#define MAX_ATTMPTS_RETX  10000
 #define MAX_ATTMPTS_CLOSE 5
 #define RECV_TIMEOUT_SEC  1 << 11
 #define RECV_TIMEOUT_SHORT_SEC 1

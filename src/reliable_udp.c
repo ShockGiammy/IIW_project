@@ -21,6 +21,8 @@
 #include <netdb.h>
 #include <net/if.h>
 #include <pthread.h>
+static int won = 0;
+static int lost = 0;
 
 static __thread cong_struct cong;
 static __thread slid_win recv_win; // the sliding window for the receiver
@@ -563,6 +565,7 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 	// we check if we will "lose" the segment
 	if(p >= loss_prob) {
 		int n_send = send(sockd, segm_to_go, n_bytes, 0);
+		//won++;
 
 		#ifdef ACTIVE_LOG
 			snprintf(msg, LOG_MSG_SIZE, "send_unreliable: Send success(%d bytes), asked to send %d bytes...\n", n_send, n_bytes);
@@ -571,6 +574,8 @@ int send_unreliable(int sockd, char *segm_to_go, int n_bytes) {
 		#endif
 	}
 	else {
+		//lost++;
+		//printf("Lost segment\nW/L: %d, %d, %f\n", won, lost, ((float)lost)/((float)won + lost));
 		#ifdef ACTIVE_LOG
 			snprintf(msg, LOG_MSG_SIZE, "send_unreliable: lost %d bytes \n", n_bytes);
 			print_on_log(fd, msg);
@@ -631,8 +636,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 
 	struct timeval rtt_timeout;
 	memset(&rtt_timeout, 0, sizeof(rtt_timeout));
-	rtt_timeout.tv_sec = send_timeo.time.tv_sec;
-	rtt_timeout.tv_usec = send_timeo.time.tv_sec;
+	rtt_timeout.tv_sec = TIME_START_SEC;
+	rtt_timeout.tv_usec = TIME_START_USEC;
 	
 	#ifdef TCP_TO
 		// useful to get strat time and end time
@@ -640,18 +645,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 		struct timeval finish_rtt;
 	#endif
 
-	if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-		fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-		return -1;
-	}
-
 	int index = 0; // sender segments list index
 
 	// we continue to send new segment / recevie acks untile we have sent and acked size bytes
 	while(bytes_left_to_send > 0 || sender_wind.bytes_acked_current_transmission < size) {
 
 		#ifdef ACTIVE_LOG
-			sprintf(msg, "Attulamente il timeout è di %ld sec e %ld usec\n", send_timeo.time.tv_sec,
+			sprintf(msg, "Attualmente il timeout è di %ld sec e %ld usec\n", send_timeo.time.tv_sec,
 			send_timeo.time.tv_usec);
 			print_on_log(fd, msg);
 			memset(msg, 0, LOG_MSG_SIZE);
@@ -691,6 +691,8 @@ int send_tcp(int sockd, void* buf, size_t size){
 			}
 			
 			if(FD_ISSET(sockd, &set_sock_send)){
+
+				// send a segment on the socket
 				int n_to_copy = (bytes_left_to_send > MSS)*MSS + (bytes_left_to_send <= MSS)*bytes_left_to_send;
 				memcpy(data_buf, buf, n_to_copy);
 
@@ -705,7 +707,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 				n_read += n_to_copy;
 				buf += n_to_copy;
 
-				if(n_to_copy >= 0) {
+				if(n_to_copy > 0) {
 					
 					#ifdef ACTIVE_LOG
 						snprintf(msg, LOG_MSG_SIZE, "send_tcp\nindex: %d, max: %d\n", index, MAX_BUF_SIZE);
@@ -723,13 +725,14 @@ int send_tcp(int sockd, void* buf, size_t size){
 						memset(msg, 0, LOG_MSG_SIZE);
 					#endif
 
+					// send segment as UDP datagram with loss probability p
 					int n_send = send_unreliable(sockd, send_buf, n_buf);
 
 					memset(send_buf, 0, HEAD_SIZE + MSS); //we reset the buffer to send the next segment
 					memset(data_buf, 0, MSS); // we reset the buffer so that we can reuse it
 					index++;
 					index %= MAX_BUF_SIZE;
-					#ifdef TCP_TO	
+					#ifdef TCP_TO
 						gettimeofday(&start_rtt, NULL);
 					#endif
 				}
@@ -744,7 +747,7 @@ int send_tcp(int sockd, void* buf, size_t size){
 		#endif
 
 		// we check if we have sent the maximum allowed bytes on the fly, in that case we need to wait for an ACK
-		if(sender_wind.on_the_fly >= sender_wind.max_size || n_read >= size) {
+		if(sender_wind.on_the_fly == sender_wind.max_size || n_read >= size) {
 			#ifdef ACTIVE_LOG
 				snprintf(msg, LOG_MSG_SIZE, "send_tcp: Waiting for ack...\n");
 				print_on_log(fd, msg);
@@ -755,108 +758,121 @@ int send_tcp(int sockd, void* buf, size_t size){
 			FD_ZERO(&set_sock_recv);
 			FD_SET(sockd, &set_sock_recv);
 
+			// Wait for ACK
 			if(select(sockd + 1, &set_sock_recv, NULL, NULL, &(rtt_timeout)) < 0 ){
 				perror("select error\n");
 				exit(EXIT_FAILURE);
 			}
 
-			if(FD_ISSET(sockd, &set_sock_recv)) { //we expect a buffer with only header and no data
-					memset(recv_ack_buf, 0, HEAD_SIZE);
+			// check if there is data to read on the socket
+			if(FD_ISSET(sockd, &set_sock_recv)) {
+				
+				#ifdef TCP_TO
+					// acquire the time to estimate the rtt
+					gettimeofday(&finish_rtt, NULL);
+					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					//printf("New TO is %ld s %ld us\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
+				#endif
 
-					recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
-					
-					#ifdef TCP_TO
-						// acquire the time to estimate the rtt
-						gettimeofday(&finish_rtt, NULL);
-						estimate_timeout(&send_timeo, start_rtt, finish_rtt);
-					#endif
+				while(1){
+					FD_ZERO(&set_sock_recv);
+					FD_SET(sockd, &set_sock_recv);
 
 					rtt_timeout.tv_sec = send_timeo.time.tv_sec;
 					rtt_timeout.tv_usec = send_timeo.time.tv_usec;
 
-					//sets the new timeout 
-					if(setsockopt(sockd, SOL_SOCKET, SO_RCVTIMEO, &send_timeo.time, sizeof(send_timeo.time)) == -1) {
-						fprintf(stderr, "send_tcp: Sender error setting opt\n%s\n", strerror(errno));
-						return -1;
+					// Wait for ACK
+					if(select(sockd + 1, &set_sock_recv, NULL, NULL, &(rtt_timeout)) < 0 ){
+						perror("select error\n");
+						exit(EXIT_FAILURE);
 					}
-					
-					//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
-					memset(&recv_segm, 0, sizeof(recv_segm));
-					ret = extract_segment(&recv_segm, recv_ack_buf);
+					else if(FD_ISSET(sockd, &set_sock_recv)){
+						//we expect a buffer with only header and no data
 						memset(recv_ack_buf, 0, HEAD_SIZE);
 
-						if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
-							close_receiver_tcp(sockd);
-						}
+						// get message from socket
+						recv(sockd, recv_ack_buf, HEAD_SIZE, 0);
+					}
+					else break;
+				}
+				
+				
+				//printf("The next time out will be of %ld sec and %ld usec \n\n", send_timeo.time.tv_sec, send_timeo.time.tv_usec);
+				memset(&recv_segm, 0, sizeof(recv_segm));
+				ret = extract_segment(&recv_segm, recv_ack_buf);
+				memset(recv_ack_buf, 0, HEAD_SIZE);
+
+				if(recv_segm.fin && !recv_segm.ack && !recv_segm.syn){
+					close_receiver_tcp(sockd);
+				}
+
+				#ifdef ACTIVE_LOG
+					snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
+							sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+					print_on_log(fd, msg);
+					memset(msg, 0, LOG_MSG_SIZE);
+				#endif
+
+				// check if it is a duplicate ack
+				if(recv_segm.ack_number == sender_wind.next_to_ack) {
+					#ifdef ACTIVE_LOG
+						snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
+						print_on_log(fd, msg);
+						memset(msg, 0, LOG_MSG_SIZE);
+					#endif
+
+					sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+
+					/*to update the congetion window*/
+					congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
+
+					//fast retransmission
+					if(sender_wind.dupl_ack == 3) {
+						times_retx++;
 
 						#ifdef ACTIVE_LOG
-							snprintf(msg, LOG_MSG_SIZE, "send_tcp\nReceived ack: %d\n%d == %d ?\nelse %d < %d && %d <= %d ?\n", recv_segm.ack_number, recv_segm.ack_number,
-									sender_wind.next_to_ack, sender_wind.next_to_ack, recv_segm.ack_number, recv_segm.ack_number, sender_wind.last_to_ack);
+							snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
 							print_on_log(fd, msg);
 							memset(msg, 0, LOG_MSG_SIZE);
 						#endif
 
-						// check if it is a duplicate ack
-						if(recv_segm.ack_number == sender_wind.next_to_ack) {
-							#ifdef ACTIVE_LOG
-								snprintf(msg, LOG_MSG_SIZE, "send_tcp: received duplicate ack\n");
-								print_on_log(fd, msg);
-								memset(msg, 0, LOG_MSG_SIZE);
-							#endif
+						/*to update the congetion window*/
+						congestion_control_duplicateAck(sender_wind);
+						check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-							sender_wind.dupl_ack++; // we increment the number of duplicate acks received
+						retx(send_segm, sender_wind, send_buf, sockd);
+						#ifdef TCP_TO
+							gettimeofday(&start_rtt, NULL);
+						#endif
+					}
+				}
+				else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
+					// the segment contains a new ack, unpack it and slide the window
+					// printf("Ack OK. Sliding the window...\n");
+					int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
+					if(bytes_acked < 0){
+						fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
+						return -1;
+					}
+					sender_wind.bytes_acked_current_transmission += bytes_acked;
 
-							/*to update the congetion window*/
-							congestion_control_caseFastRetrasmission_duplicateAck(sender_wind);
-							check_size_buffer(sender_wind, recv_segm.receiver_window);
+					/*to update the congestion window*/
+					congestion_control_receiveAck(sender_wind);
+					check_size_buffer(sender_wind, recv_segm.receiver_window);
 
-							//fast retransmission
-							if(sender_wind.dupl_ack == 3) {
-								times_retx++;
+					slide_window(&sender_wind, &recv_segm, send_segm);
 
-								#ifdef ACTIVE_LOG
-									snprintf(msg, LOG_MSG_SIZE, "send_tcp: Fast retx\n");
-									print_on_log(fd, msg);
-									memset(msg, 0, LOG_MSG_SIZE);
-								#endif
-
-								/*to update the congetion window*/
-								congestion_control_duplicateAck(sender_wind);
-								check_size_buffer(sender_wind, recv_segm.receiver_window);
-
-								retx(send_segm, sender_wind, send_buf, sockd);
-								#ifdef TCP_TO
-									gettimeofday(&start_rtt, NULL);
-								#endif
-							}
-						}
-
-						// the segment contains a new ack, unpack it and slide the window
-						else if((sender_wind.next_to_ack < recv_segm.ack_number) && (recv_segm.ack_number <= sender_wind.last_to_ack)) {
-							// printf("Ack OK. Sliding the window...\n");
-							int bytes_acked = recv_segm.ack_number - sender_wind.next_to_ack;
-							if(bytes_acked < 0){
-								fprintf(stderr, "Bytes acked is negative: %d\n", bytes_acked);
-								return -1;
-							}
-							sender_wind.bytes_acked_current_transmission += bytes_acked;
-
-							/*to update the congetion window*/
-							congestion_control_receiveAck(sender_wind);
-							check_size_buffer(sender_wind, recv_segm.receiver_window);
-
-							slide_window(&sender_wind, &recv_segm, send_segm);
-
-							times_retx = 0;
-						}
+					times_retx = 0;
+				}
 			}
-			// we have to retx the last segment not acked due to TO
 			else {
-
+				// we have to retx the last segment not acked due to TO
 				#ifdef TCP_TO
 					// estimates the timeout and sets the new values
-					gettimeofday(&finish_rtt, NULL);
-					estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					//gettimeofday(&finish_rtt, NULL);
+					//estimate_timeout(&send_timeo, start_rtt, finish_rtt);
+					//updating_rtt = false;
 				#endif
 
 				rtt_timeout.tv_sec = send_timeo.time.tv_sec;
@@ -884,12 +900,13 @@ int send_tcp(int sockd, void* buf, size_t size){
 					gettimeofday(&start_rtt, NULL);
 				#endif
 			}
+
 			memset(recv_segm.data, 0, recv_segm.data_length);
 			memset(send_buf, 0, MSS+HEAD_SIZE);
 
 			if(times_retx >= MAX_ATTMPTS_RETX){
-				fprintf(stderr, "send_tcp: Retransmitted many times but did not receive any reply...\n");
-				send_tcp(sockd, "ERRCONG", strlen("ERRCONG"));
+				fprintf(stderr, "Lost connection...\nRetransmitted many times but did not receive any reply...\n");
+				send(sockd, "ERRCONG", strlen("ERRCONG"), 0);
 				close(sockd);
 				printf("Connection closed\n");
 				for(int i=0; i < MAX_LINE_DECOR; i++)
