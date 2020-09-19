@@ -1419,7 +1419,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	struct sockaddr_in new_sock_addr;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	new_sock_addr.sin_addr 		  = addr->sin_addr;
+	inet_aton("192.168.1.166", &(new_sock_addr.sin_addr));
 
 	for(int i=0; i< MAX_LINE_DECOR; i++)
 		printf("-");
@@ -1427,7 +1427,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	
 	char address_string[INET_ADDRSTRLEN];
 	int bind_attmpts = 0;
-	new_sock_addr.sin_port = getpid() + 1024;
+	new_sock_addr.sin_port = htons(getpid() + 8000);
 
 	//look for a port for the current thread
 	//try to bind to the port, if unsuccessful, abort
@@ -1470,14 +1470,13 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	make_seg(segment, snd_buf);
 	printf("sd: %d\n", socket_descriptor);
 
-	socklen_t len = INET_ADDRSTRLEN;
-
 	// send SYN message
-	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, len) < 0 ){
+	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, sizeof(*addr)) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nError while sending syn...\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
+	socklen_t len = INET_ADDRSTRLEN;
 	printf("Waiting server response...\n");
 	// wait for syn-ack with information about the new port, which is dedicated to the  to use for communication
 	if( recvfrom(socket_descriptor, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &server_addr, &len) < 0 ){
@@ -1535,6 +1534,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 		return -1;
 	}
 
+	printf("Client address is %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
+
 	// get client address and port information
 	char address_string[INET_ADDRSTRLEN];
 	inet_ntop(client_address.sin_family, &client_address.sin_addr, address_string, INET_ADDRSTRLEN);
@@ -1549,7 +1550,7 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	// set up a port for the client
 	int sock_conn = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP);
-	int port = getpid() + 1024;
+	int port = htons(getpid() + 1024);
 
 	struct sockaddr_in new_sock_addr;
 	if (new_port == 0) {
@@ -1561,7 +1562,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	new_sock_addr.sin_addr 		  = client_address.sin_addr;
+	
+	inet_aton("192.168.1.166", &(new_sock_addr.sin_addr));
     new_sock_addr.sin_port        = htons(new_port);
 
 	memset(address_string, 0, INET_ADDRSTRLEN);
@@ -1581,7 +1583,7 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	
 	// connect to the client using the information from before
 	if( connect(sock_conn, (struct sockaddr*) &client_address, len) < 0){
-		perror("connect: failed to create socket with bound client address\n");
+		perror("connect: failed to connect to client\n");
 		fprintf(stderr, "%s\n", strerror(errno));
 		return -1;
 	}
@@ -1591,8 +1593,11 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	// check the message received from the client
 	if(head_rcv.syn){
 		printf("Received Syn, sending Syn-Ack...\n");
-		// send SYN-ACK
-		send_flags(sock_conn, Syn | Ack);
+		//send SYN-ACK
+		if(send_flags(sock_conn, Syn | Ack) < 0){
+			perror("send_flags failed\n");
+			return -1;
+		}
 	}
 	else {
 		perror("Missing SYN\n");
@@ -1603,7 +1608,10 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 	printf("Waiting for ack...\n");
 	
 	// wait for ACK
-	recv_tcp_segm(sock_conn, &head_rcv);
+	if(recv_tcp_segm(sock_conn, &head_rcv) < 0){
+		perror("recv_segm error\n");
+		return -1;
+	}
 
 	printf("head: %d,%d %d%d%d %d\n", head_rcv.sequence_number, head_rcv.ack_number, head_rcv.ack, head_rcv.syn, head_rcv.fin, head_rcv.data_length);
 
