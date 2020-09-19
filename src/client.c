@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 					/*command PUT*/
 					else if(strcmp(command, "put") == 0) {
 						if (SendFile(conn_s, fname, path) == 0) {
-							printf("file transfer completed \n");
+							printf("file transfer completed! \n");
 						}
 						else {
 							printf("file transfer error \n");

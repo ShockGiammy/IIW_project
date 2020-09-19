@@ -227,10 +227,16 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	// means that the segment is not in the list anymore
 	if(!retransmitted){
 		fprintf(stderr, "retx failed\n");
-		printf("Connection closed");
+		send_tcp(socket_desc, "ERRCONG", strlen("ERRCONG"));
+		close(socket_desc);
+		printf("Connection closed\n");
+		for(int i=0; i < MAX_LINE_DECOR; i++)
+			printf("-");
+		printf("\n");
+		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
-	// printf("\nFinished retx\n");
+	
 	#ifdef ACTIVE_LOG
 		snprintf(msg, LOG_MSG_SIZE, "Finished retx\n");
 		print_on_log(fd, msg);

@@ -150,17 +150,14 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		else if(strcmp(argv[4], "put") == 0) {
-			n = recv_tcp(conn_s, server_response, BUFSIZ);
-			if( n < 0 || ( strcmp(server_response, "rcvd fn") != 0 )){
-				fprintf(stderr, "Server side did not receive filename, response: %s\n", server_response);
-				exit(EXIT_FAILURE);
-			}
+
 			if (SendFile(conn_s, argv[3], path) < 0) {
 				fprintf(stderr, "Error while uploading the file \n");
 				if(close(conn_s) == -1)
 					fprintf(stderr, "Error while closing socket\n");
 				exit(EXIT_FAILURE);
 			}
+			printf("file transfer completed! \n");
 		}
 
         gettimeofday(&end, NULL);

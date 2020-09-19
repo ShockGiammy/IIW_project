@@ -153,7 +153,7 @@ void *evadi_richiesta(void *socket_desc) {
 				/*command GET*/
 				if(strcmp(client_request, "get") == 0) {
 					if (SendFile(socket, filesName, path) == 0) {
-						printf("file transfer completed\n");
+						printf("file transfer completed! \n");
 					}
 					else {
 						printf("file transfer error\n");
