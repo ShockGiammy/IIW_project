@@ -24,7 +24,6 @@
 #include <math.h>
 #include "reliable_udp.h"
 #include "helper.h"           /*  our own helper functions  */
-#include "manage_client.h"
 
 
 char *path = "server_files/";

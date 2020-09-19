@@ -1419,7 +1419,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	struct sockaddr_in new_sock_addr;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	inet_aton("192.168.1.166", &(new_sock_addr.sin_addr));
+	new_sock_addr.sin_addr 		  = addr->sin_addr;
 
 	for(int i=0; i< MAX_LINE_DECOR; i++)
 		printf("-");
@@ -1562,8 +1562,8 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	
-	inet_aton("192.168.1.166", &(new_sock_addr.sin_addr));
+
+	new_sock_addr.sin_addr 		  = client_address.sin_addr;
     new_sock_addr.sin_port        = htons(new_port);
 
 	memset(address_string, 0, INET_ADDRSTRLEN);
