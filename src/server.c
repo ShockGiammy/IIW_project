@@ -265,7 +265,7 @@ int main(int argc, char *argv[]) {
     servaddr.sin_port        = htons(port);
 
     /*  Bind our socket addresss to the 
-	listening socket, and call listen()  */
+	listening socket				 */
 
     if ( bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
 		fprintf(stderr, "Server: error during the bind.\n");

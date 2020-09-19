@@ -1413,7 +1413,7 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	struct sockaddr_in new_sock_addr;
 	memset(&new_sock_addr, 0, sizeof(new_sock_addr));
     new_sock_addr.sin_family      = AF_INET;
-	new_sock_addr.sin_addr 		  = addr->sin_addr;
+	inet_aton("127.0.0.1", &(new_sock_addr.sin_addr));
 
 	for(int i=0; i< MAX_LINE_DECOR; i++)
 		printf("-");
@@ -1464,14 +1464,13 @@ int connect_tcp(int socket_descriptor, struct sockaddr_in* addr, socklen_t addr_
 	make_seg(segment, snd_buf);
 	printf("sd: %d\n", socket_descriptor);
 
-	socklen_t len = INET_ADDRSTRLEN;
-
 	// send SYN message
-	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, len) < 0 ){
+	if( sendto(socket_descriptor, snd_buf, HEAD_SIZE, 0, (struct sockaddr*) addr, sizeof(*addr)) < 0 ){
 		fprintf(stderr, "socket_descriptor: %d\nError while sending syn...\n%s\n", socket_descriptor, strerror(errno));
 		return -1;
 	}
 
+	socklen_t len = INET_ADDRSTRLEN;
 	printf("Waiting server response...\n");
 	// wait for syn-ack with information about the new port, which is dedicated to the  to use for communication
 	if( recvfrom(socket_descriptor, recv_buf, HEAD_SIZE, 0, (struct sockaddr *) &server_addr, &len) < 0 ){

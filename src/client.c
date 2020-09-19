@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
 
     /*  Create the listening socket  */
 
-    if ((conn_s = socket(AF_INET, SOCKET_TYPE, 0)) < 0 ) {
+    if ((conn_s = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP)) < 0 ) {
 		fprintf(stderr, "client: creation socket error\n");
 		exit(EXIT_FAILURE);
     }
