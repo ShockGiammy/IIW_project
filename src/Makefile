@@ -6,29 +6,26 @@ CSRC	= client.c
 
 all: $(CLIENT) $(SERVER)
 
-$(SERVER): $(SERVER).o reliable_udp.o helper.o manage_client.o
-	gcc -o $(SERVER) $(SERVER).o reliable_udp.o helper.o manage_client.o -pthread
+$(SERVER): $(SERVER).o reliable_udp.o helper.o
+	gcc -o $(SERVER) $(SERVER).o reliable_udp.o helper.o -pthread
 
-$(SERVER).o: $(SSRC) reliable_udp.h helper.h manage_client.h
+$(SERVER).o: $(SSRC) reliable_udp.h helper.h
 	gcc -o $(SERVER).o $(SSRC) -c -pthread
 
-$(CLIENT): $(CLIENT).o reliable_udp.o helper.o manage_client.o
-	gcc -o $(CLIENT) $(CLIENT).o reliable_udp.o helper.o manage_client.o -pthread
+$(CLIENT): $(CLIENT).o reliable_udp.o helper.o
+	gcc -o $(CLIENT) $(CLIENT).o reliable_udp.o helper.o -pthread
 
-$(CLIENT).o: $(CSRC) reliable_udp.h helper.h manage_client.h
+$(CLIENT).o: $(CSRC) reliable_udp.h helper.h
 	gcc -o $(CLIENT).o $(CSRC) -c -pthread
 
-test: test.o reliable_udp.o helper.o manage_client.o
-	gcc -o test test.o reliable_udp.o helper.o manage_client.o -pthread
+test: test.o reliable_udp.o helper.o
+	gcc -o test test.o reliable_udp.o helper.o -pthread
 
 reliable_udp.o: reliable_udp.c reliable_udp.h
 	gcc -o reliable_udp.o reliable_udp.c -c
 
 helper.o: helper.c helper.h
 	gcc -o helper.o helper.c -c -pthread
-
-manage_client.o : manage_client.c manage_client.h
-	gcc -o manage_client.o manage_client.c -c
 
 clean:
 	rm -f *.o
