@@ -227,12 +227,12 @@ void retx(tcp *segments, slid_win win, char *buffer, int socket_desc) {
 	// means that the segment is not in the list anymore
 	if(!retransmitted){
 		fprintf(stderr, "retx failed\n");
-		send_tcp(socket_desc, "ERRCONG", strlen("ERRCONG"));
-		close(socket_desc);
 		printf("Connection closed\n");
 		for(int i=0; i < MAX_LINE_DECOR; i++)
 			printf("-");
 		printf("\n");
+		send_tcp(socket_desc, "ERRCONG", strlen("ERRCONG"));
+		close(socket_desc);
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
@@ -1550,7 +1550,7 @@ int accept_tcp(int sockd, struct sockaddr* addr, socklen_t* addr_len){
 
 	// set up a port for the client
 	int sock_conn = socket(AF_INET, SOCKET_TYPE, IPPROTO_UDP);
-	int port = htons(getpid() + 1024);
+	int port = getpid() + 1024;
 
 	struct sockaddr_in new_sock_addr;
 	if (new_port == 0) {
